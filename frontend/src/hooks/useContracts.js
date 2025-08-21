@@ -522,7 +522,6 @@ export const useContracts = () => {
     }
   }, [contractsReady, contracts.projectFactory]);
 
-  // Claim project funds (for farmers)
   const claimProjectFunds = useCallback(async (projectId) => {
     if (!contractsReady || !contracts.projectFactory || !isConnected) {
       throw new Error('Wallet not connected or contracts not ready');
@@ -531,14 +530,30 @@ export const useContracts = () => {
     try {
       setLoading(true);
       
+      console.log('🔍 useContracts.claimProjectFunds called:', {
+        projectId,
+        contractsReady,
+        hasProjectFactory: !!contracts.projectFactory,
+        isConnected,
+        account
+      });
+      
       // Use our precision-safe check
+      console.log('🔍 Checking canClaimFunds...');
       const canClaim = await canClaimFunds(projectId);
+      console.log('🔍 canClaimFunds result:', canClaim);
+      
       if (!canClaim) {
         throw new Error('Funds cannot be claimed yet. Project may not be completed or funds already released.');
       }
       
+      console.log('🔍 Calling contracts.projectFactory.claimProjectFunds...');
       const tx = await contracts.projectFactory.claimProjectFunds(projectId);
+      console.log('🔍 Transaction sent:', tx.hash);
+      
+      console.log('🔍 Waiting for transaction confirmation...');
       const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt);
       
       // Clear cache for this project since it was updated
       clearProjectCache(projectId);
@@ -554,7 +569,13 @@ export const useContracts = () => {
       return { tx, receipt };
       
     } catch (error) {
-      console.error('Fund claim error:', error);
+      console.error('❌ useContracts.claimProjectFunds error:', {
+        error,
+        message: error.message,
+        reason: error.reason,
+        code: error.code
+      });
+      
       toast({
         title: 'Fund Claim Failed',
         description: error.reason || error.message,

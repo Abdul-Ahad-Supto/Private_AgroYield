@@ -30,7 +30,7 @@ module.exports = {
       chainId: 80002,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
       // Use dynamic gas pricing (network will estimate optimal prices)
-      gas: 6000000,
+      gas: 60000000,
       timeout: 60000, // 60 seconds timeout
     },
     // Add Polygon mainnet for future deployment

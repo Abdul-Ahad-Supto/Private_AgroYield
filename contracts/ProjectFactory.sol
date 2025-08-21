@@ -375,6 +375,8 @@ contract ProjectFactory is ReentrancyGuard {
      * @notice This is the main function used by frontend to determine if farmer can claim funds
      * Uses the same multi-method tolerance approach as completion check
      */
+
+
     function canClaimFunds(uint256 projectId) external view returns (bool) {
         Project memory project = projects[projectId];
         
@@ -383,40 +385,31 @@ contract ProjectFactory is ReentrancyGuard {
         if (project.fundsReleased) return false;
         if (project.currentAmountUSDC == 0) return false;
         
-        // ENHANCED: Multi-method precision-safe completion check
+        // Enhanced precision-safe completion check
         uint256 current = project.currentAmountUSDC;
         uint256 target = project.targetAmountUSDC;
         
         // Method 1: Exact completion
-        bool exactCompletion = current >= target;
+        if (current >= target) return true;
         
-        // Method 2: Absolute tolerance (0.01 USDC)
-        bool absoluteTolerance = false;
+        // Method 2: Absolute tolerance (0.01 USDC = 10000 with 6 decimals)
+        uint256 absoluteTolerance = 10000; // 0.01 USDC
         if (target > current) {
             uint256 difference = target - current;
-            absoluteTolerance = difference <= ABSOLUTE_TOLERANCE_USDC;
-        } else {
-            absoluteTolerance = true;
+            if (difference <= absoluteTolerance) return true;
         }
         
-        // Method 3: Percentage tolerance (0.1%)
-        bool percentageTolerance = false;
+        // Method 3: Percentage tolerance (0.1% = 10 basis points)
         if (target > 0) {
             uint256 difference = target > current ? target - current : 0;
-            uint256 percentageThreshold = (target * PERCENTAGE_TOLERANCE_BASIS_POINTS) / 10000;
-            percentageTolerance = difference <= percentageThreshold;
+            uint256 percentageThreshold = (target * 10) / 10000; // 0.1%
+            if (difference <= percentageThreshold) return true;
         }
         
-        // Allow claiming if ANY method indicates completion
-        bool isNearlyComplete = exactCompletion || absoluteTolerance || percentageTolerance;
-        
-        // Must be nearly complete AND in appropriate status
-        return isNearlyComplete && (
-            project.status == ProjectStatus.Completed || 
-            project.status == ProjectStatus.Active // Allow claiming for active projects that are precision-complete
-        );
+        // Must be in appropriate status
+        return (project.status == ProjectStatus.Completed || 
+                project.status == ProjectStatus.Active);
     }
-    
     /**
      * @dev ENHANCED: Allow farmer to claim funds when project is precision-safe completed
      */
