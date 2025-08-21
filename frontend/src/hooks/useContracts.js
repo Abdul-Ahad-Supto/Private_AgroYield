@@ -1,4 +1,4 @@
-// frontend/src/hooks/useContracts.js - UPDATED with Fund Release
+// frontend/src/hooks/useContracts.js - FIXED VERSION WITH PRECISION-SAFE FUND CLAIMING
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { ethers } from 'ethers';
 import { useToast } from '@chakra-ui/react';
@@ -13,6 +13,37 @@ const CONTRACT_ADDRESSES = {
   projectFactory: process.env.REACT_APP_PROJECT_FACTORY,
   investmentManager: process.env.REACT_APP_INVESTMENT_MANAGER,
   usdc: process.env.REACT_APP_USDC_ADDRESS
+};
+
+// ==========================================
+// PRECISION-SAFE UTILITIES
+// ==========================================
+
+/**
+ * Check if project is completed with tolerance for rounding errors
+ * @param {string|number} currentAmount - Current funding amount
+ * @param {string|number} targetAmount - Target funding amount
+ * @param {number} toleranceUSDC - Tolerance in USDC (default 0.01 USDC)
+ * @returns {boolean} - Whether project is effectively completed
+ */
+const isProjectPrecisionComplete = (currentAmount, targetAmount, toleranceUSDC = 0.01) => {
+  const current = parseFloat(currentAmount || '0');
+  const target = parseFloat(targetAmount || '0');
+  
+  if (target === 0) return false;
+  
+  const difference = target - current;
+  const isComplete = difference <= toleranceUSDC;
+  
+  console.log('🔍 Precision Check:', {
+    current: current.toFixed(6),
+    target: target.toFixed(6),
+    difference: difference.toFixed(6),
+    toleranceUSDC,
+    isComplete
+  });
+  
+  return isComplete;
 };
 
 export const useContracts = () => {
@@ -442,7 +473,56 @@ export const useContracts = () => {
     }
   }, [contractsReady, contracts.investmentManager, contracts.usdc, isConnected, account, toast, clearProjectCache]);
 
-  // NEW: Claim project funds (for farmers)
+  // FIXED: Precision-safe fund claiming check
+  const canClaimFunds = useCallback(async (projectId) => {
+    if (!contractsReady || !contracts.projectFactory || !projectId) {
+      return false;
+    }
+    
+    try {
+      // First try the smart contract function
+      let canClaim = false;
+      try {
+        canClaim = await contracts.projectFactory.canClaimFunds(projectId);
+        console.log('🏦 Smart contract canClaimFunds result:', canClaim);
+      } catch (error) {
+        console.log('Smart contract canClaimFunds failed:', error.message);
+      }
+      
+      // If smart contract says no, check using precision-safe calculation
+      if (!canClaim) {
+        const project = await contracts.projectFactory.getProject(projectId);
+        if (project && project.id !== '0') {
+          // Use precision-safe completion check with 0.01 USDC tolerance
+          const isNearlyComplete = isProjectPrecisionComplete(
+            project.currentAmountUSDC, 
+            project.targetAmountUSDC,
+            0.01 // 0.01 USDC tolerance for rounding errors
+          );
+          const isNotReleased = !project.fundsReleased;
+          
+          canClaim = isNearlyComplete && isNotReleased;
+          
+          if (canClaim) {
+            console.log('✅ Precision-safe check allows fund claiming:', {
+              projectId,
+              currentAmount: project.currentAmountUSDC,
+              targetAmount: project.targetAmountUSDC,
+              difference: (parseFloat(project.targetAmountUSDC) - parseFloat(project.currentAmountUSDC)).toFixed(6),
+              fundsReleased: project.fundsReleased
+            });
+          }
+        }
+      }
+      
+      return canClaim;
+    } catch (error) {
+      console.error('Error checking fund claim eligibility:', error);
+      return false;
+    }
+  }, [contractsReady, contracts.projectFactory]);
+
+  // Claim project funds (for farmers)
   const claimProjectFunds = useCallback(async (projectId) => {
     if (!contractsReady || !contracts.projectFactory || !isConnected) {
       throw new Error('Wallet not connected or contracts not ready');
@@ -451,8 +531,8 @@ export const useContracts = () => {
     try {
       setLoading(true);
       
-      // Check if funds can be claimed
-      const canClaim = await contracts.projectFactory.canClaimFunds(projectId);
+      // Use our precision-safe check
+      const canClaim = await canClaimFunds(projectId);
       if (!canClaim) {
         throw new Error('Funds cannot be claimed yet. Project may not be completed or funds already released.');
       }
@@ -486,23 +566,9 @@ export const useContracts = () => {
     } finally {
       setLoading(false);
     }
-  }, [contractsReady, contracts.projectFactory, isConnected, toast, clearProjectCache]);
+  }, [contractsReady, contracts.projectFactory, isConnected, toast, clearProjectCache, canClaimFunds]);
 
-  // NEW: Check if farmer can claim funds
-  const canClaimFunds = useCallback(async (projectId) => {
-    if (!contractsReady || !contracts.projectFactory || !projectId) {
-      return false;
-    }
-    
-    try {
-      return await contracts.projectFactory.canClaimFunds(projectId);
-    } catch (error) {
-      console.error('Error checking fund claim eligibility:', error);
-      return false;
-    }
-  }, [contractsReady, contracts.projectFactory]);
-
-  // NEW: Get investment constraints
+  // Get investment constraints
   const getInvestmentConstraints = useCallback(async (projectId) => {
     if (!contractsReady || !contracts.investmentManager || !projectId) {
       return null;
@@ -603,7 +669,7 @@ export const useContracts = () => {
     getInvestorData,
     getInvestmentConstraints,
     
-    // NEW: Fund release functions
+    // FIXED: Precision-safe fund release functions
     claimProjectFunds,
     canClaimFunds,
     
@@ -611,6 +677,9 @@ export const useContracts = () => {
     getPlatformStats,
     
     // Contract addresses for reference
-    addresses: CONTRACT_ADDRESSES
+    addresses: CONTRACT_ADDRESSES,
+    
+    // Utility functions
+    isProjectPrecisionComplete
   };
 };
