@@ -7,12 +7,16 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./ProjectFactory.sol";
 
 /**
- * @title Enhanced InvestmentManager - Complete with Fund Release
- * @dev Handles USDC investments with flexible minimum for final investments + Fund Release to Farmers
- * @notice Allows dynamic minimum investment when projects are near completion
+ * @title InvestmentManager - COMPLETE FINAL VERSION
+ * @dev Handles USDC investments with complete fund release and return distribution system
+ * @notice Supports flexible final investments, automatic completion, and proportional returns
  */
 contract InvestmentManager is ReentrancyGuard {
     using SafeERC20 for IERC20;
+    
+    // ==========================================
+    // STRUCTS
+    // ==========================================
     
     struct InvestorData {
         uint256 totalInvested;
@@ -28,25 +32,51 @@ contract InvestmentManager is ReentrancyGuard {
         bool returned;
         bool claimed;
     }
+
+    struct InvestorReturn {
+        uint256 principalAmount;
+        uint256 returnAmount;
+        bool claimed;
+        uint256 claimedAt;
+    }
+    
+    // ==========================================
+    // STATE VARIABLES
+    // ==========================================
     
     ProjectFactory public immutable projectFactory;
     IERC20 public immutable USDC;
     
+    // Investment tracking
     mapping(address => InvestorData) public investors;
     mapping(address => mapping(uint256 => uint256)) public investorProjectAmount;
     mapping(uint256 => YieldInfo) public projectYields;
     mapping(address => uint256) public pendingReturns;
     
-    // NEW: Fund release tracking
+    // Fund release tracking
     mapping(uint256 => bool) public fundsReleased;
     mapping(uint256 => uint256) public releasedAmount;
     mapping(uint256 => uint256) public releasedAt;
+
+    // Return distribution tracking
+    mapping(uint256 => mapping(address => InvestorReturn)) public investorReturns;
+    mapping(uint256 => uint256) public totalReturnsDeposited;
+    mapping(uint256 => bool) public returnsDistributed;
+    mapping(uint256 => uint256) public returnDepositedAt;
+    
+    // ==========================================
+    // CONSTANTS
+    // ==========================================
     
     uint256 public constant MIN_INVESTMENT = 10 * 1e6; // 10 USDC
     uint256 public constant MAX_INVESTMENT = 10000 * 1e6; // 10,000 USDC
     uint256 public constant ANNUAL_RETURN_RATE = 1200; // 12%
     uint256 public constant PLATFORM_FEE = 150; // 1.5%
-    uint256 public constant FINAL_INVESTMENT_THRESHOLD = 20 * 1e6; // 20 USDC threshold
+    uint256 public constant FINAL_INVESTMENT_THRESHOLD = 20 * 1e6; // 20 USDC
+    
+    // ==========================================
+    // EVENTS
+    // ==========================================
     
     event InvestmentMade(
         address indexed investor,
@@ -57,6 +87,26 @@ contract InvestmentManager is ReentrancyGuard {
         bool isFinalInvestment
     );
     
+    event ExcessRefunded(
+        address indexed investor,
+        uint256 indexed projectId,
+        uint256 refundAmount
+    );
+    
+    event FundsReleasedToFarmer(
+        uint256 indexed projectId,
+        address indexed farmer,
+        uint256 amount,
+        uint256 timestamp
+    );
+
+    event ReturnsDeposited(
+        uint256 indexed projectId,
+        address indexed farmer,
+        uint256 totalAmount,
+        uint256 timestamp
+    );
+    
     event ReturnsDistributed(
         uint256 indexed projectId,
         uint256 totalReturns,
@@ -65,29 +115,22 @@ contract InvestmentManager is ReentrancyGuard {
     
     event ReturnsClaimed(
         address indexed investor,
-        uint256 amount
+        uint256 indexed projectId,
+        uint256 principalAmount,
+        uint256 returnAmount,
+        uint256 totalClaimed
     );
-    
+
     event ProjectFunded(
         uint256 indexed projectId,
         uint256 totalAmount,
         uint256 investorCount
     );
-    
-    event ExcessRefunded(
-        address indexed investor,
-        uint256 indexed projectId,
-        uint256 refundAmount
-    );
-    
-    // NEW: Fund release events
-    event FundsReleasedToFarmer(
-        uint256 indexed projectId,
-        address indexed farmer,
-        uint256 amount,
-        uint256 timestamp
-    );
-    
+
+    // ==========================================
+    // CONSTRUCTOR
+    // ==========================================
+
     constructor(address _projectFactory, address _usdc) {
         require(_projectFactory != address(0), "Invalid project factory");
         require(_usdc != address(0), "Invalid USDC address");
@@ -95,6 +138,10 @@ contract InvestmentManager is ReentrancyGuard {
         projectFactory = ProjectFactory(_projectFactory);
         USDC = IERC20(_usdc);
     }
+    
+    // ==========================================
+    // INVESTMENT FUNCTIONS
+    // ==========================================
     
     /**
      * @dev Calculate the actual minimum investment required for a project
@@ -136,11 +183,6 @@ contract InvestmentManager is ReentrancyGuard {
     
     /**
      * @dev Get comprehensive investment constraints for a project
-     * @param projectId The project ID
-     * @return minInvestment Minimum investment required
-     * @return maxInvestment Maximum investment allowed
-     * @return remainingAmount Amount needed to complete funding
-     * @return canCompleteFunding Whether investor can complete the funding
      */
     function getInvestmentConstraints(uint256 projectId) external view returns (
         uint256 minInvestment,
@@ -159,7 +201,6 @@ contract InvestmentManager is ReentrancyGuard {
         maxInvestment = MAX_INVESTMENT;
         
         // Adjust max investment to not exceed remaining amount (accounting for fees)
-        // Formula: gross = net / (1 - fee_rate)
         uint256 maxPossibleGross = (remainingAmount * 10000) / (10000 - PLATFORM_FEE);
         if (maxPossibleGross < maxInvestment) {
             maxInvestment = maxPossibleGross;
@@ -169,7 +210,7 @@ contract InvestmentManager is ReentrancyGuard {
     }
     
     /**
-     * @dev Enhanced investment function with flexible final investment handling
+     * @dev Main investment function with flexible final investment handling
      */
     function investInProject(uint256 projectId, uint256 amountUSDC) external nonReentrant {
         require(projectFactory.isUserRegistered(msg.sender), "User not registered");
@@ -230,9 +271,6 @@ contract InvestmentManager is ReentrancyGuard {
             if (netInvestment > remainingAmount) {
                 // Calculate excess and refund
                 uint256 excessNet = netInvestment - remainingAmount;
-                
-                // Calculate the gross amount that corresponds to this excess net
-                // Using the formula: gross = net / (1 - fee_rate)
                 uint256 excessGross = (excessNet * 10000) / (10000 - PLATFORM_FEE);
                 
                 // Adjust amounts
@@ -309,8 +347,12 @@ contract InvestmentManager is ReentrancyGuard {
         }
     }
     
+    // ==========================================
+    // FUND RELEASE FUNCTIONS
+    // ==========================================
+    
     /**
-     * @dev NEW: Release funds to farmer when project is completed
+     * @dev Release funds to farmer when project is completed
      * This function is called by the ProjectFactory when farmer claims funds
      */
     function releaseFundsToFarmer(
@@ -326,6 +368,9 @@ contract InvestmentManager is ReentrancyGuard {
         ProjectFactory.Project memory project = projectFactory.getProject(projectId);
         require(project.farmer == farmer, "Invalid farmer");
         require(project.status == ProjectFactory.ProjectStatus.Completed, "Project not completed");
+        
+        // Ensure we have enough balance
+        require(USDC.balanceOf(address(this)) >= amount, "Insufficient contract balance");
         
         // Mark funds as released
         fundsReleased[projectId] = true;
@@ -367,48 +412,65 @@ contract InvestmentManager is ReentrancyGuard {
         );
     }
     
+    // ==========================================
+    // RETURN DISTRIBUTION FUNCTIONS
+    // ==========================================
+    
     /**
-     * @dev Farmer deposits returns for completed project
+     * @dev Farmer deposits returns for completed project (ETH returns)
      */
     function depositReturns(uint256 projectId) external payable nonReentrant {
         ProjectFactory.Project memory project = projectFactory.getProject(projectId);
         require(project.farmer == msg.sender, "Only project farmer can deposit returns");
-        require(
-            project.status == ProjectFactory.ProjectStatus.Completed ||
-            project.status == ProjectFactory.ProjectStatus.FundsReleased,
-            "Project not completed"
-        );
-        require(!projectYields[projectId].returned, "Returns already deposited");
+        require(fundsReleased[projectId], "Funds must be released first");
+        require(!returnsDistributed[projectId], "Returns already distributed");
+        require(msg.value > 0, "Must send ETH returns");
         
-        YieldInfo storage yieldInfo = projectYields[projectId];
-        uint256 expectedTotalReturn = yieldInfo.principalAmount + yieldInfo.expectedReturn;
+        // Record the total returns deposited
+        totalReturnsDeposited[projectId] = msg.value;
+        returnDepositedAt[projectId] = block.timestamp;
         
-        require(msg.value >= expectedTotalReturn, "Insufficient return amount");
+        // Mark as distributed to prevent double deposits
+        returnsDistributed[projectId] = true;
         
-        yieldInfo.returned = true;
-        _distributeReturns(projectId, msg.value);
+        // Calculate and set individual investor returns
+        _calculateInvestorReturns(projectId, msg.value);
         
+        emit ReturnsDeposited(projectId, msg.sender, msg.value, block.timestamp);
         emit ReturnsDistributed(projectId, msg.value, project.investorCount);
     }
-    
+
     /**
-     * @dev Internal function to distribute returns proportionally
+     * @dev Calculate proportional returns for each investor
      */
-    function _distributeReturns(uint256 projectId, uint256 totalAmount) internal {
+    function _calculateInvestorReturns(uint256 projectId, uint256 totalReturnsETH) internal {
         ProjectFactory.Investment[] memory investments = projectFactory.getProjectInvestments(projectId);
         uint256 totalPrincipal = projectYields[projectId].principalAmount;
+        
+        require(totalPrincipal > 0, "No investments found");
         
         for (uint256 i = 0; i < investments.length; i++) {
             address investor = investments[i].investor;
             uint256 investmentAmount = investments[i].amount;
             
-            uint256 investorReturn = (totalAmount * investmentAmount) / totalPrincipal;
-            pendingReturns[investor] += investorReturn;
+            // Calculate proportional return
+            uint256 investorReturnETH = (totalReturnsETH * investmentAmount) / totalPrincipal;
+            
+            // Set investor return data
+            investorReturns[projectId][investor] = InvestorReturn({
+                principalAmount: investmentAmount,
+                returnAmount: investorReturnETH,
+                claimed: false,
+                claimedAt: 0
+            });
+            
+            // Add to pending returns
+            pendingReturns[investor] += investorReturnETH;
         }
     }
     
     /**
-     * @dev Claim pending returns
+     * @dev Claim all pending returns (across all projects)
      */
     function claimReturns() external nonReentrant {
         uint256 amount = pendingReturns[msg.sender];
@@ -420,8 +482,45 @@ contract InvestmentManager is ReentrancyGuard {
         (bool success, ) = payable(msg.sender).call{value: amount}("");
         require(success, "Return transfer failed");
         
-        emit ReturnsClaimed(msg.sender, amount);
+        emit ReturnsClaimed(msg.sender, 0, 0, amount, amount);
     }
+
+    /**
+     * @dev Claim returns for specific project
+     */
+    function claimProjectReturns(uint256 projectId) external nonReentrant {
+        InvestorReturn storage investorReturn = investorReturns[projectId][msg.sender];
+        require(investorReturn.returnAmount > 0, "No returns available for this project");
+        require(!investorReturn.claimed, "Returns already claimed for this project");
+        
+        uint256 totalClaim = investorReturn.returnAmount;
+        
+        // Mark as claimed
+        investorReturn.claimed = true;
+        investorReturn.claimedAt = block.timestamp;
+        
+        // Update pending returns
+        pendingReturns[msg.sender] -= investorReturn.returnAmount;
+        
+        // Update investor data
+        investors[msg.sender].claimedReturns += totalClaim;
+        
+        // Transfer ETH
+        (bool success, ) = payable(msg.sender).call{value: totalClaim}("");
+        require(success, "Return transfer failed");
+        
+        emit ReturnsClaimed(
+            msg.sender, 
+            projectId, 
+            investorReturn.principalAmount, 
+            investorReturn.returnAmount, 
+            totalClaim
+        );
+    }
+    
+    // ==========================================
+    // VIEW FUNCTIONS
+    // ==========================================
     
     /**
      * @dev Calculate expected return based on principal and duration
@@ -480,6 +579,43 @@ contract InvestmentManager is ReentrancyGuard {
             yieldInfo.returnDate,
             yieldInfo.returned,
             yieldInfo.claimed
+        );
+    }
+
+    /**
+     * @dev Get investor's return information for a specific project
+     */
+    function getInvestorProjectReturn(address investor, uint256 projectId) external view returns (
+        uint256 principalAmount,
+        uint256 returnAmount,
+        bool claimed,
+        uint256 claimedAt
+    ) {
+        InvestorReturn memory investorReturn = investorReturns[projectId][investor];
+        return (
+            investorReturn.principalAmount,
+            investorReturn.returnAmount,
+            investorReturn.claimed,
+            investorReturn.claimedAt
+        );
+    }
+
+    /**
+     * @dev Get complete return status for a project
+     */
+    function getProjectReturnStatus(uint256 projectId) external view returns (
+        bool fundsReleased_,
+        uint256 releasedAmount_,
+        bool returnsDistributed_,
+        uint256 totalReturnsDeposited_,
+        uint256 returnDepositedAt_
+    ) {
+        return (
+            fundsReleased[projectId],
+            releasedAmount[projectId],
+            returnsDistributed[projectId],
+            totalReturnsDeposited[projectId],
+            returnDepositedAt[projectId]
         );
     }
     
@@ -553,6 +689,34 @@ contract InvestmentManager is ReentrancyGuard {
             isNearCompletion,
             isCompleted
         );
+    }
+
+    /**
+     * @dev Get all projects an investor has invested in with return data
+     */
+    function getInvestorProjects(address investor) external view returns (
+        uint256[] memory projectIds,
+        uint256[] memory investmentAmounts,
+        uint256[] memory returnAmounts,
+        bool[] memory returnsClaimed
+    ) {
+        uint256[] memory projects = investors[investor].projectIds;
+        uint256 length = projects.length;
+        
+        projectIds = new uint256[](length);
+        investmentAmounts = new uint256[](length);
+        returnAmounts = new uint256[](length);
+        returnsClaimed = new bool[](length);
+        
+        for (uint256 i = 0; i < length; i++) {
+            uint256 projectId = projects[i];
+            projectIds[i] = projectId;
+            investmentAmounts[i] = investorProjectAmount[investor][projectId];
+            returnAmounts[i] = investorReturns[projectId][investor].returnAmount;
+            returnsClaimed[i] = investorReturns[projectId][investor].claimed;
+        }
+        
+        return (projectIds, investmentAmounts, returnAmounts, returnsClaimed);
     }
     
     /**

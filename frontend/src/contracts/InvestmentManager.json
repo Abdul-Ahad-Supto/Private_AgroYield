@@ -165,13 +165,62 @@
         "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "projectId",
+        "type": "uint256"
+      },
+      {
         "indexed": false,
         "internalType": "uint256",
-        "name": "amount",
+        "name": "principalAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "returnAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "totalClaimed",
         "type": "uint256"
       }
     ],
     "name": "ReturnsClaimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "projectId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "farmer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "totalAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "ReturnsDeposited",
     "type": "event"
   },
   {
@@ -337,6 +386,19 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "projectId",
+        "type": "uint256"
+      }
+    ],
+    "name": "claimProjectReturns",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -525,6 +587,79 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "investor",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "projectId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getInvestorProjectReturn",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "principalAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "returnAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "claimed",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "claimedAt",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "investor",
+        "type": "address"
+      }
+    ],
+    "name": "getInvestorProjects",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "projectIds",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "investmentAmounts",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "returnAmounts",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "bool[]",
+        "name": "returnsClaimed",
+        "type": "bool[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "projectId",
         "type": "uint256"
@@ -612,6 +747,45 @@
         "type": "uint256"
       }
     ],
+    "name": "getProjectReturnStatus",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "fundsReleased_",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "releasedAmount_",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "returnsDistributed_",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalReturnsDeposited_",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "returnDepositedAt_",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "projectId",
+        "type": "uint256"
+      }
+    ],
     "name": "getProjectYieldInfo",
     "outputs": [
       {
@@ -679,6 +853,45 @@
       {
         "internalType": "uint256",
         "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "investorReturns",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "principalAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "returnAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "claimed",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "claimedAt",
         "type": "uint256"
       }
     ],
@@ -860,6 +1073,63 @@
       }
     ],
     "name": "releasedAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "returnDepositedAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "returnsDistributed",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "totalReturnsDeposited",
     "outputs": [
       {
         "internalType": "uint256",

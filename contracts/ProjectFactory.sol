@@ -71,6 +71,7 @@ contract ProjectFactory is ReentrancyGuard {
     address public investmentManager;
     
     // Platform constants
+    uint256 public constant COMPLETION_TOLERANCE = 1e4;
     uint256 public constant MIN_FUNDING_AMOUNT = 10 * 1e6; // 10 USDC
     uint256 public constant MAX_FUNDING_AMOUNT = 100000 * 1e6; // 100k USDC
     uint256 public constant MIN_DURATION_DAYS = 30;
@@ -324,23 +325,22 @@ contract ProjectFactory is ReentrancyGuard {
         uint256 current = projects[projectId].currentAmountUSDC;
         uint256 target = projects[projectId].targetAmountUSDC;
         
-        // Complete if within 0.01 USDC (1 cent) of target
-        if (current >= target || (target - current) <= 1e4) { // 0.01 USDC = 1e4 with 6 decimals
+        // Complete if within tolerance (handles rounding from fees/decimals)
+        if (current >= target || (target - current) <= COMPLETION_TOLERANCE) {
             ProjectStatus oldStatus = projects[projectId].status;
             projects[projectId].status = ProjectStatus.Completed;
             userProfiles[projects[projectId].farmer].totalRaised += projects[projectId].currentAmountUSDC;
             
-            // ✅ ADD MISSING ProjectCompleted EVENT
             emit ProjectCompleted(
                 projectId,
                 projects[projectId].currentAmountUSDC,
                 projects[projectId].investorCount
             );
             
-            // ✅ FIX: Move this emit inside the if block
             emit ProjectStatusUpdated(projectId, oldStatus, ProjectStatus.Completed);
         }
     }
+
     
     /**
      * @dev NEW: Allow farmer to claim funds when project is completed

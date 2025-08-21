@@ -1,0 +1,72 @@
+{
+  "network": "amoy",
+  "chainId": 80002,
+  "timestamp": "2025-08-21T10:57:55.458Z",
+  "deployer": "0x456a150ce19FE081158B2DDd68438bFAf967D73b",
+  "deployerBalance": "30.660098239125411023",
+  "usdcAddress": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+  "version": "2.0.0-production-final",
+  "status": "FULLY_WORKING",
+  "contracts": {
+    "projectFactory": "0x2481f765F70BC96055bf7D80E8B29bA9Deb88a82",
+    "investmentManager": "0x04d35ad5e6B03ADA061d4DBFC9139279877C685b",
+    "yieldDistributor": "0x8a51a9312587aC27c559E4BA9fA983C98dF9A8F4",
+    "governanceModule": "0x055cF168f0D2712007780AEe12F512183A258DE3"
+  },
+  "verification": {
+    "contractsLinked": true,
+    "linkingTransaction": "0x24479ddfe69dc004e2a9ab5c2e2801be0de6f4ee5f4c444bcb7f80c31c8e80b3",
+    "allSystemsWorking": true
+  },
+  "features": {
+    "projectCreation": true,
+    "investment": true,
+    "fundClaiming": true,
+    "returnDeposit": true,
+    "returnClaiming": true,
+    "governance": true,
+    "fullLifecycle": true
+  },
+  "deploymentLog": [
+    {
+      "step": 1,
+      "contract": "ProjectFactory",
+      "address": "0x2481f765F70BC96055bf7D80E8B29bA9Deb88a82",
+      "timestamp": "2025-08-21T10:57:25.916Z",
+      "gasUsed": "estimated"
+    },
+    {
+      "step": 2,
+      "contract": "InvestmentManager",
+      "address": "0x04d35ad5e6B03ADA061d4DBFC9139279877C685b",
+      "dependencies": [
+        "0x2481f765F70BC96055bf7D80E8B29bA9Deb88a82",
+        "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"
+      ],
+      "timestamp": "2025-08-21T10:57:31.388Z"
+    },
+    {
+      "step": 3,
+      "action": "Link Contracts",
+      "transaction": "0x24479ddfe69dc004e2a9ab5c2e2801be0de6f4ee5f4c444bcb7f80c31c8e80b3",
+      "gasUsed": "44178",
+      "timestamp": "2025-08-21T10:57:44.139Z"
+    },
+    {
+      "step": 4,
+      "contract": "YieldDistributor",
+      "address": "0x8a51a9312587aC27c559E4BA9fA983C98dF9A8F4",
+      "dependencies": [
+        "0x2481f765F70BC96055bf7D80E8B29bA9Deb88a82",
+        "0x04d35ad5e6B03ADA061d4DBFC9139279877C685b"
+      ],
+      "timestamp": "2025-08-21T10:57:49.620Z"
+    },
+    {
+      "step": 5,
+      "contract": "GovernanceModule",
+      "address": "0x055cF168f0D2712007780AEe12F512183A258DE3",
+      "timestamp": "2025-08-21T10:57:53.853Z"
+    }
+  ]
+}
