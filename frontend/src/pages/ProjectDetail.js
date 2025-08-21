@@ -1,4 +1,4 @@
-// frontend/src/pages/ProjectDetail.js - COMPLETE FIXED VERSION with Claim Button Fix
+// frontend/src/pages/ProjectDetail.js - PRECISION-SAFE VERSION
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -61,6 +61,94 @@ import { useWeb3 } from '../contexts/Web3Context';
 import { useContracts } from '../hooks/useContracts';
 import CORSSafeImage from '../components/CORSSafeImage';
 import FundClaimModal from '../components/FundClaimModal';
+
+// ==========================================
+// PRECISION-SAFE CALCULATION UTILITIES
+// ==========================================
+
+/**
+ * Converts a number to its integer representation for precise calculations
+ * @param {number|string} num - Number to convert
+ * @param {number} decimals - Number of decimal places
+ * @returns {number} - Integer representation
+ */
+const toSafeInteger = (num, decimals = 6) => {
+  const numValue = typeof num === 'string' ? parseFloat(num) : num;
+  return Math.round(numValue * Math.pow(10, decimals));
+};
+
+/**
+ * Converts integer back to decimal with specified precision
+ * @param {number} safeInt - Integer representation
+ * @param {number} decimals - Number of decimal places
+ * @returns {number} - Decimal value
+ */
+const fromSafeInteger = (safeInt, decimals = 6) => {
+  return safeInt / Math.pow(10, decimals);
+};
+
+/**
+ * Calculate funding percentage with precision safety
+ * @param {string|number} currentAmount - Current funding amount
+ * @param {string|number} targetAmount - Target funding amount
+ * @returns {number} - Precise percentage (0-100)
+ */
+const calculatePreciseFundingProgress = (currentAmount, targetAmount) => {
+  // Convert to safe integers (using 6 decimal places for USDC)
+  const currentInt = toSafeInteger(currentAmount, 6);
+  const targetInt = toSafeInteger(targetAmount, 6);
+  
+  if (targetInt === 0) return 0;
+  
+  // Calculate percentage using integers, then scale back
+  const percentageInt = Math.round((currentInt * 10000) / targetInt); // 10000 for 2 decimal precision in percentage
+  const percentage = percentageInt / 100; // Convert back to percentage
+  
+  return Math.min(percentage, 100); // Cap at 100%
+};
+
+/**
+ * Check if project is completed with tolerance for rounding errors
+ * @param {string|number} currentAmount - Current funding amount
+ * @param {string|number} targetAmount - Target funding amount
+ * @param {number} tolerance - Tolerance percentage (default 0.01% = 0.0001)
+ * @returns {boolean} - Whether project is effectively completed
+ */
+const isProjectCompleted = (currentAmount, targetAmount, tolerance = 0.0001) => {
+  const currentInt = toSafeInteger(currentAmount, 6);
+  const targetInt = toSafeInteger(targetAmount, 6);
+  
+  if (targetInt === 0) return false;
+  
+  // Calculate the difference in "safe integer" space
+  const difference = targetInt - currentInt;
+  const toleranceInt = Math.round(targetInt * tolerance);
+  
+  console.log('🔍 Completion Check (Precision-Safe):', {
+    currentAmount: currentAmount,
+    targetAmount: targetAmount,
+    currentInt,
+    targetInt,
+    difference,
+    toleranceInt,
+    isCompleted: difference <= toleranceInt,
+    percentage: calculatePreciseFundingProgress(currentAmount, targetAmount)
+  });
+  
+  // Project is completed if the difference is within tolerance
+  return difference <= toleranceInt;
+};
+
+/**
+ * Format number for display with consistent precision
+ * @param {string|number} num - Number to format
+ * @param {number} decimals - Decimal places
+ * @returns {string} - Formatted number
+ */
+const formatNumber = (num, decimals = 2) => {
+  const numValue = typeof num === 'string' ? parseFloat(num) : num;
+  return numValue.toFixed(decimals);
+};
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -148,36 +236,59 @@ const ProjectDetail = () => {
     }
   }, [getProject, project]);
 
-  // Memoized calculations - FIXED with proper null checks
+  // ✅ FIXED: Precision-safe project metrics calculation
   const projectMetrics = useMemo(() => {
-    // ✅ Add null check first
     if (!project) return null;
 
-    const fundingProgress = project.targetAmountUSDC > 0 
-      ? (parseFloat(project.currentAmountUSDC) / parseFloat(project.targetAmountUSDC)) * 100 
-      : 0;
+    // Use precision-safe calculations
+    const fundingProgress = calculatePreciseFundingProgress(
+      project.currentAmountUSDC, 
+      project.targetAmountUSDC
+    );
 
     const daysLeft = project.deadline ? 
       Math.max(0, Math.floor((new Date(parseInt(project.deadline) * 1000) - new Date()) / (1000 * 60 * 60 * 24))) 
       : 'N/A';
 
-    const isCompleted = fundingProgress >= 100;
+    // ✅ FIXED: Use precision-safe completion check
+    const isCompleted = isProjectCompleted(
+      project.currentAmountUSDC, 
+      project.targetAmountUSDC,
+      0.001 // 0.1% tolerance for rounding errors
+    );
     
-    // ✅ Add null check for account and project.farmer
-    const isFarmer = account && project.farmer && account.toLowerCase() === project.farmer.toLowerCase();
+    const currentAmount = parseFloat(project.currentAmountUSDC || '0');
+    const targetAmount = parseFloat(project.targetAmountUSDC || '0');
+    
+    const isFarmer = account && project.farmer && 
+      account.toLowerCase() === project.farmer.toLowerCase();
+
+    console.log('🔍 ProjectMetrics (Precision-Safe):', {
+      currentAmountUSDC: project.currentAmountUSDC,
+      targetAmountUSDC: project.targetAmountUSDC,
+      fundingProgress,
+      isCompleted,
+      isFarmer,
+      precisionCheck: {
+        current: currentAmount,
+        target: targetAmount,
+        difference: targetAmount - currentAmount,
+        differenceUSDC: (targetAmount - currentAmount).toFixed(6)
+      }
+    });
 
     return {
-      fundingProgress: Math.min(fundingProgress, 100),
+      fundingProgress,
       daysLeft,
-      currentAmount: parseFloat(project.currentAmountUSDC || '0'),
-      targetAmount: parseFloat(project.targetAmountUSDC || '0'),
+      currentAmount,
+      targetAmount,
       investorCount: project.investorCount || '0',
       isCompleted,
       isFarmer
     };
   }, [project, account]);
 
-  // Fetch additional data - UPDATED with claim button fix
+  // Fetch additional data - UPDATED with precision-safe claim check
   const fetchAdditionalData = useCallback(async () => {
     if (!isConnected || !account || !contractsReady || !id) return;
     
@@ -198,7 +309,7 @@ const ProjectDetail = () => {
         }
       }
       
-      // ✅ UPDATED - Check claim eligibility with tolerance for 99.99%+ projects
+      // ✅ FIXED: Use precision-safe completion check for farmer claim eligibility
       if (project && project.farmer === account) {
         let canClaim = false;
         
@@ -211,14 +322,20 @@ const ProjectDetail = () => {
           }
         }
         
-        // ✅ If smart contract says no, check if 99.99%+ funded (rounding tolerance)
+        // ✅ If smart contract says no, check using precision-safe calculation
         if (!canClaim && projectMetrics) {
-          const isNearlyComplete = projectMetrics.fundingProgress >= 99.99;
+          const isNearlyComplete = isProjectCompleted(
+            project.currentAmountUSDC, 
+            project.targetAmountUSDC,
+            0.001 // 0.1% tolerance
+          );
           const isNotReleased = !project.fundsReleased;
           canClaim = isNearlyComplete && isNotReleased;
           
           if (canClaim) {
-            console.log('✅ Allowing claim due to 99.99%+ funding (rounding tolerance)', {
+            console.log('✅ Allowing claim due to precision-safe completion check', {
+              currentAmount: project.currentAmountUSDC,
+              targetAmount: project.targetAmountUSDC,
               fundingProgress: projectMetrics.fundingProgress,
               fundsReleased: project.fundsReleased
             });
@@ -346,9 +463,8 @@ const ProjectDetail = () => {
     await fetchAdditionalData();
   }, [fetchProjectData, fetchAdditionalData, id]);
 
-  // Get project status - FIXED with proper status mapping
+  // ✅ FIXED: Get project status with precision-safe calculations
   const getProjectStatus = useMemo(() => {
-    // ✅ Add proper null checks
     if (!project) return { text: 'Loading...', color: 'gray' };
     if (!projectMetrics) return { text: 'Loading...', color: 'gray' };
     
@@ -358,9 +474,9 @@ const ProjectDetail = () => {
     }
     
     // Map the actual blockchain status values
-    switch (Number(project.status)) { // ✅ Convert to number
+    switch (Number(project.status)) {
       case 0: // Active
-        if (projectMetrics.isCompleted || projectMetrics.fundingProgress >= 99.99) {
+        if (projectMetrics.isCompleted) {
           return { text: 'Fully Funded', color: 'green' };
         }
         return { text: 'Active', color: 'blue' };
@@ -379,48 +495,6 @@ const ProjectDetail = () => {
         return { text: 'Unknown', color: 'gray' };
     }
   }, [project, projectMetrics]);
-
-  // Add debug logging when project exists
-  useEffect(() => {
-    if (project) {
-      console.log('Project Debug:', {
-        id: project.id,
-        currentAmountUSDC: project.currentAmountUSDC,
-        targetAmountUSDC: project.targetAmountUSDC,
-        status: project.status,
-        statusType: typeof project.status,
-        statusNumber: Number(project.status),
-        fundsReleased: project.fundsReleased,
-        fundingProgress: (parseFloat(project.currentAmountUSDC) / parseFloat(project.targetAmountUSDC)) * 100
-      });
-    }
-  }, [project]);
-  useEffect(() => {
-  if (projectMetrics && project) {
-    console.log('🔍 Claim Debug Check:', {
-      'projectMetrics?.isFarmer': projectMetrics?.isFarmer,
-      'projectMetrics.isCompleted': projectMetrics?.isCompleted,
-      'projectMetrics.fundingProgress': projectMetrics?.fundingProgress,
-      'fundingProgress >= 99.99': projectMetrics?.fundingProgress >= 99.99,
-      'project.fundsReleased': project?.fundsReleased,
-      'shouldShowButton': projectMetrics?.isFarmer && (projectMetrics?.isCompleted || projectMetrics?.fundingProgress >= 99.99) && !project?.fundsReleased
-    });
-  }
-}, [projectMetrics, project]);
-
-  // Add debug for claim button
-  useEffect(() => {
-    if (projectMetrics && project) {
-      console.log('Claim Button Debug:', {
-        isFarmer: projectMetrics.isFarmer,
-        isCompleted: projectMetrics.isCompleted,
-        fundingProgress: projectMetrics.fundingProgress,
-        fundsReleased: project.fundsReleased,
-        canClaimProjectFunds,
-        shouldShowClaim: projectMetrics.isFarmer && (projectMetrics.isCompleted || projectMetrics.fundingProgress >= 99.99) && !project.fundsReleased
-      });
-    }
-  }, [projectMetrics, project, canClaimProjectFunds]);
 
   // Loading state
   if (isLoading) {
@@ -640,7 +714,7 @@ const ProjectDetail = () => {
                   </VStack>
                 </TabPanel>
 
-                {/* Farmer Actions Tab - UPDATED with claim button fix */}
+                {/* ✅ FIXED: Farmer Actions Tab with precision-safe claim button */}
                 {projectMetrics?.isFarmer && (
                   <TabPanel px={0}>
                     <VStack spacing={6} align="stretch">
@@ -666,7 +740,7 @@ const ProjectDetail = () => {
                                 </Box>
                               </HStack>
                               
-                              {(projectMetrics.isCompleted || projectMetrics.fundingProgress >= 99.99) ? (
+                              {projectMetrics.isCompleted ? (
                                 project.fundsReleased ? (
                                   <Badge colorScheme="purple" p={2}>
                                     ✓ Funds Claimed
@@ -688,12 +762,12 @@ const ProjectDetail = () => {
                             <HStack justify="space-between">
                               <Text fontSize="sm" color="gray.500">Available to Claim:</Text>
                               <Text fontWeight="bold" fontSize="lg" color="green.500">
-                                {projectMetrics.currentAmount.toFixed(2)} USDC
+                                {formatNumber(projectMetrics.currentAmount, 2)} USDC
                               </Text>
                             </HStack>
 
-                            {/* ✅ UPDATED claim button condition */}
-                            {(projectMetrics.isCompleted || projectMetrics.fundingProgress >= 99.99) && !project.fundsReleased ? (
+                            {/* ✅ FIXED: Precision-safe claim button condition */}
+                            {projectMetrics.isCompleted && !project.fundsReleased ? (
                               <Button
                                 colorScheme="green"
                                 leftIcon={<FaCheckCircle />}
@@ -720,7 +794,8 @@ const ProjectDetail = () => {
                                   <AlertTitle fontSize="sm">Funding in Progress</AlertTitle>
                                   <AlertDescription fontSize="sm">
                                     Wait for your project to be fully funded before claiming funds.
-                                    Current: {projectMetrics.fundingProgress.toFixed(2)}%
+                                    Current: {formatNumber(projectMetrics.fundingProgress, 3)}%
+                                    Need: {formatNumber(projectMetrics.targetAmount - projectMetrics.currentAmount, 6)} USDC more
                                   </AlertDescription>
                                 </Box>
                               </Alert>
@@ -751,14 +826,14 @@ const ProjectDetail = () => {
                   <>
                     <Box>
                       <Text fontSize="sm" color="gray.500" mb={1}>
-                        Raised of {projectMetrics.targetAmount.toLocaleString()} USDC goal
+                        Raised of {formatNumber(projectMetrics.targetAmount, 2)} USDC goal
                       </Text>
                       <Box display="flex" alignItems="center" mb={2}>
                         <Text fontSize="2xl" fontWeight="bold" mr={2}>
-                          {projectMetrics.currentAmount.toFixed(2)} USDC
+                          {formatNumber(projectMetrics.currentAmount, 2)} USDC
                         </Text>
                         <Text color="green.500" fontWeight="medium">
-                          {Math.round(projectMetrics.fundingProgress)}%
+                          {formatNumber(projectMetrics.fundingProgress, 2)}%
                         </Text>
                       </Box>
                       <Progress 
@@ -791,7 +866,7 @@ const ProjectDetail = () => {
                 {isConnected && (
                   <Box p={3} bg="gray.50" borderRadius="md">
                     <Text fontSize="sm" color="gray.600" mb={1}>Your USDC Balance:</Text>
-                    <Text fontWeight="bold">{parseFloat(usdcBalance).toFixed(2)} USDC</Text>
+                    <Text fontWeight="bold">{formatNumber(parseFloat(usdcBalance), 2)} USDC</Text>
                   </Box>
                 )}
 
@@ -805,19 +880,19 @@ const ProjectDetail = () => {
                       <HStack justify="space-between">
                         <Text fontSize="xs" color="blue.600">Minimum:</Text>
                         <Text fontSize="xs" fontWeight="bold" color="blue.700">
-                          {parseFloat(investmentConstraints.minInvestment).toFixed(2)} USDC
+                          {formatNumber(parseFloat(investmentConstraints.minInvestment), 2)} USDC
                         </Text>
                       </HStack>
                       <HStack justify="space-between">
                         <Text fontSize="xs" color="blue.600">Maximum:</Text>
                         <Text fontSize="xs" color="blue.600">
-                          {parseFloat(investmentConstraints.maxInvestment).toFixed(2)} USDC
+                          {formatNumber(parseFloat(investmentConstraints.maxInvestment), 2)} USDC
                         </Text>
                       </HStack>
                       <HStack justify="space-between">
                         <Text fontSize="xs" color="blue.600">Remaining:</Text>
                         <Text fontSize="xs" fontWeight="bold" color="blue.700">
-                          {parseFloat(investmentConstraints.remainingAmount).toFixed(2)} USDC
+                          {formatNumber(parseFloat(investmentConstraints.remainingAmount), 6)} USDC
                         </Text>
                       </HStack>
                       {investmentConstraints.canCompleteFunding && (
@@ -830,7 +905,7 @@ const ProjectDetail = () => {
                 )}
                 
                 {/* Investment Button */}
-                {(projectMetrics?.isCompleted || projectMetrics?.fundingProgress >= 99.99) ? (
+                {projectMetrics?.isCompleted ? (
                   <Alert status="success" borderRadius="md">
                     <AlertIcon />
                     <Box>
@@ -864,8 +939,8 @@ const ProjectDetail = () => {
                   </Button>
                 )}
 
-                {/* ✅ UPDATED Farmer Claim Button in Sidebar */}
-                {projectMetrics?.isFarmer && (projectMetrics.isCompleted || projectMetrics.fundingProgress >= 99.99) && !project.fundsReleased && (
+                {/* ✅ FIXED: Precision-safe Farmer Claim Button in Sidebar */}
+                {projectMetrics?.isFarmer && projectMetrics.isCompleted && !project.fundsReleased && (
                   <Button 
                     colorScheme="green" 
                     size="lg" 
@@ -873,7 +948,7 @@ const ProjectDetail = () => {
                     leftIcon={<FaHandHoldingUsd />}
                     onClick={onClaimOpen}
                   >
-                    Claim {projectMetrics.currentAmount.toFixed(2)} USDC
+                    Claim {formatNumber(projectMetrics.currentAmount, 2)} USDC
                   </Button>
                 )}
                 
@@ -897,6 +972,39 @@ const ProjectDetail = () => {
                   <Text color="green.500" fontWeight="bold">12% annually</Text>
                   <Text fontSize="xs" color="gray.500">Platform estimated return</Text>
                 </Box>
+
+                {/* ✅ NEW: Precision Debug Info (only in development) */}
+                {process.env.NODE_ENV === 'development' && projectMetrics && (
+                  <Box p={3} bg="yellow.50" borderRadius="md" border="1px solid" borderColor="yellow.200">
+                    <Text fontSize="xs" fontWeight="bold" color="yellow.700" mb={2}>
+                      Debug: Precision Info
+                    </Text>
+                    <VStack align="stretch" spacing={1}>
+                      <HStack justify="space-between">
+                        <Text fontSize="xs" color="yellow.600">Current:</Text>
+                        <Text fontSize="xs" fontFamily="mono">{project.currentAmountUSDC}</Text>
+                      </HStack>
+                      <HStack justify="space-between">
+                        <Text fontSize="xs" color="yellow.600">Target:</Text>
+                        <Text fontSize="xs" fontFamily="mono">{project.targetAmountUSDC}</Text>
+                      </HStack>
+                      <HStack justify="space-between">
+                        <Text fontSize="xs" color="yellow.600">Progress:</Text>
+                        <Text fontSize="xs" fontFamily="mono">{formatNumber(projectMetrics.fundingProgress, 6)}%</Text>
+                      </HStack>
+                      <HStack justify="space-between">
+                        <Text fontSize="xs" color="yellow.600">Completed:</Text>
+                        <Text fontSize="xs" fontFamily="mono">{projectMetrics.isCompleted ? 'true' : 'false'}</Text>
+                      </HStack>
+                      <HStack justify="space-between">
+                        <Text fontSize="xs" color="yellow.600">Difference:</Text>
+                        <Text fontSize="xs" fontFamily="mono">
+                          {formatNumber(projectMetrics.targetAmount - projectMetrics.currentAmount, 6)} USDC
+                        </Text>
+                      </HStack>
+                    </VStack>
+                  </Box>
+                )}
               </VStack>
             </Box>
           </Box>
@@ -913,7 +1021,7 @@ const ProjectDetail = () => {
             <VStack spacing={4} align="stretch">
               <Box>
                 <Text fontSize="sm" color="gray.500" mb={2}>Your USDC Balance</Text>
-                <Text fontSize="lg" fontWeight="bold">{parseFloat(usdcBalance).toFixed(2)} USDC</Text>
+                <Text fontSize="lg" fontWeight="bold">{formatNumber(parseFloat(usdcBalance), 2)} USDC</Text>
               </Box>
 
               {investmentConstraints && (
@@ -922,15 +1030,15 @@ const ProjectDetail = () => {
                   <VStack spacing={1} align="stretch">
                     <HStack justify="space-between">
                       <Text fontSize="xs" color="gray.600">Minimum Required:</Text>
-                      <Text fontSize="xs" fontWeight="bold">{parseFloat(investmentConstraints.minInvestment).toFixed(2)} USDC</Text>
+                      <Text fontSize="xs" fontWeight="bold">{formatNumber(parseFloat(investmentConstraints.minInvestment), 2)} USDC</Text>
                     </HStack>
                     <HStack justify="space-between">
                       <Text fontSize="xs" color="gray.600">Maximum Allowed:</Text>
-                      <Text fontSize="xs">{parseFloat(investmentConstraints.maxInvestment).toFixed(2)} USDC</Text>
+                      <Text fontSize="xs">{formatNumber(parseFloat(investmentConstraints.maxInvestment), 2)} USDC</Text>
                     </HStack>
                     <HStack justify="space-between">
                       <Text fontSize="xs" color="gray.600">Remaining to Goal:</Text>
-                      <Text fontSize="xs" fontWeight="bold" color="green.600">{parseFloat(investmentConstraints.remainingAmount).toFixed(2)} USDC</Text>
+                      <Text fontSize="xs" fontWeight="bold" color="green.600">{formatNumber(parseFloat(investmentConstraints.remainingAmount), 6)} USDC</Text>
                     </HStack>
                     {investmentConstraints.canCompleteFunding && (
                       <Alert status="success" mt={2} p={2}>
@@ -957,7 +1065,7 @@ const ProjectDetail = () => {
                   <NumberInputField 
                     placeholder={`Enter amount (min: ${
                       investmentConstraints 
-                        ? parseFloat(investmentConstraints.minInvestment).toFixed(2) 
+                        ? formatNumber(parseFloat(investmentConstraints.minInvestment), 2) 
                         : '10.00'
                     } USDC)`} 
                   />
@@ -968,7 +1076,7 @@ const ProjectDetail = () => {
                 </NumberInput>
                 <Text fontSize="xs" color="gray.500" mt={1}>
                   {investmentConstraints 
-                    ? `Minimum: ${parseFloat(investmentConstraints.minInvestment).toFixed(2)} USDC`
+                    ? `Minimum: ${formatNumber(parseFloat(investmentConstraints.minInvestment), 2)} USDC`
                     : 'Minimum investment: 10 USDC'
                   }
                 </Text>
@@ -984,16 +1092,16 @@ const ProjectDetail = () => {
                     </HStack>
                     <HStack justify="space-between">
                       <Text fontSize="xs" color="gray.600">Platform Fee (1.5%):</Text>
-                      <Text fontSize="xs">{(parseFloat(investmentAmount) * 0.015).toFixed(2)} USDC</Text>
+                      <Text fontSize="xs">{formatNumber(parseFloat(investmentAmount) * 0.015, 2)} USDC</Text>
                     </HStack>
                     <HStack justify="space-between">
                       <Text fontSize="xs" color="gray.600">Net Investment:</Text>
-                      <Text fontSize="xs" fontWeight="bold">{(parseFloat(investmentAmount) * 0.985).toFixed(2)} USDC</Text>
+                      <Text fontSize="xs" fontWeight="bold">{formatNumber(parseFloat(investmentAmount) * 0.985, 2)} USDC</Text>
                     </HStack>
                     <HStack justify="space-between">
                       <Text fontSize="xs" color="gray.600">Expected Annual Return:</Text>
                       <Text fontSize="xs" color="green.600" fontWeight="bold">
-                        {(parseFloat(investmentAmount) * 0.12).toFixed(2)} USDC (12%)
+                        {formatNumber(parseFloat(investmentAmount) * 0.12, 2)} USDC (12%)
                       </Text>
                     </HStack>
                   </VStack>
