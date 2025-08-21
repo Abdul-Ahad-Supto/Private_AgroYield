@@ -109,11 +109,18 @@ const formatNumber = (num, decimals = 2) => {
 };
 
 const FundClaimModal = ({ isOpen, onClose, project, onSuccess }) => {
+  
   const [canClaim, setCanClaim] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [checkingEligibility, setCheckingEligibility] = useState(true);
   
-  const { claimProjectFunds, canClaimFunds } = useContracts();
+  const { claimProjectFunds, canClaimFunds, clearProjectCache } = useContracts();
+  console.log('🔍 FundClaimModal Debug:', {
+    claimProjectFunds: typeof claimProjectFunds,
+    canClaimFunds: typeof canClaimFunds,
+    claimExists: !!claimProjectFunds,
+    canClaimExists: !!canClaimFunds
+  });
   const toast = useToast();
   
   // Color mode values
@@ -182,14 +189,47 @@ const FundClaimModal = ({ isOpen, onClose, project, onSuccess }) => {
       checkEligibility();
     }
   }, [isOpen, project?.id, project?.currentAmountUSDC, project?.targetAmountUSDC, project?.fundsReleased, canClaimFunds]);
-
   const handleClaimFunds = async () => {
     if (!project?.id || !claimProjectFunds) return;
 
     try {
       setClaiming(true);
       
-      await claimProjectFunds(project.id);
+      console.log('🔍 Starting claim process:', {
+        projectId: project.id,
+        claimFunctionType: typeof claimProjectFunds,
+        canClaimFunctionType: typeof canClaimFunds
+      });
+      
+      // Step 1: Check eligibility again
+      console.log('🔍 Step 1: Checking claim eligibility...');
+      const canClaim = await canClaimFunds(project.id);
+      console.log('🔍 Can claim result:', canClaim);
+      
+      if (!canClaim) {
+        throw new Error('Funds cannot be claimed yet. Project may not be completed or funds already released.');
+      }
+      
+      // Step 2: Attempt the claim
+      console.log('🔍 Step 2: Attempting to claim funds...');
+      console.log('🔍 Calling claimProjectFunds with projectId:', project.id);
+      
+      const result = await claimProjectFunds(project.id);
+      
+      console.log('✅ Claim successful:', result);
+      
+      // Clear cache for this project since it was updated
+      if (clearProjectCache) {
+        clearProjectCache(project.id);
+      }
+      
+      toast({
+        title: 'Funds Claimed Successfully',
+        description: `Project funds have been transferred to your wallet`,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
       
       // Success - close modal and refresh data
       if (onSuccess) {
@@ -198,8 +238,21 @@ const FundClaimModal = ({ isOpen, onClose, project, onSuccess }) => {
       onClose();
       
     } catch (error) {
-      console.error('Fund claim failed:', error);
-      // Error handling is done in useContracts hook
+      console.error('❌ Fund claim error details:', {
+        error: error,
+        message: error.message,
+        reason: error.reason,
+        code: error.code,
+        data: error.data
+      });
+      
+      toast({
+        title: 'Fund Claim Failed',
+        description: error.reason || error.message,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     } finally {
       setClaiming(false);
     }
