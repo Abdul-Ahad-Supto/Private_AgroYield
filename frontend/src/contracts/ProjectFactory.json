@@ -192,6 +192,19 @@
   },
   {
     "inputs": [],
+    "name": "ABSOLUTE_TOLERANCE_USDC",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "COMPLETION_TOLERANCE_PERCENTAGE",
     "outputs": [
       {
@@ -245,6 +258,19 @@
   {
     "inputs": [],
     "name": "MIN_FUNDING_AMOUNT",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "PERCENTAGE_TOLERANCE_BASIS_POINTS",
     "outputs": [
       {
         "internalType": "uint256",

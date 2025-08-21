@@ -1,4 +1,4 @@
-// frontend/src/components/FundClaimModal.js - PRECISION-SAFE VERSION
+// frontend/src/components/FundClaimModal.js - UPDATED FOR PROJECTFACTORY CLAIMING
 import React, { useState, useEffect } from 'react';
 import {
   Modal,
@@ -114,6 +114,7 @@ const FundClaimModal = ({ isOpen, onClose, project, onSuccess }) => {
   const [claiming, setClaiming] = useState(false);
   const [checkingEligibility, setCheckingEligibility] = useState(true);
   
+  // ✅ UPDATED: Use the correct hook functions
   const { claimProjectFunds, canClaimFunds, clearProjectCache } = useContracts();
   console.log('🔍 FundClaimModal Debug:', {
     claimProjectFunds: typeof claimProjectFunds,
@@ -127,7 +128,7 @@ const FundClaimModal = ({ isOpen, onClose, project, onSuccess }) => {
   const alertBg = useColorModeValue('green.50', 'green.900');
   const statBg = useColorModeValue('gray.50', 'gray.700');
 
-  // ✅ UPDATED - Check if funds can be claimed with precision-safe calculations
+  // ✅ Check if funds can be claimed with precision-safe calculations
   useEffect(() => {
     const checkEligibility = async () => {
       if (!project?.id) return;
@@ -136,7 +137,7 @@ const FundClaimModal = ({ isOpen, onClose, project, onSuccess }) => {
         setCheckingEligibility(true);
         let eligible = false;
         
-        // First check smart contract
+        // First check smart contract via ProjectFactory
         if (canClaimFunds) {
           try {
             eligible = await canClaimFunds(project.id);
@@ -189,13 +190,15 @@ const FundClaimModal = ({ isOpen, onClose, project, onSuccess }) => {
       checkEligibility();
     }
   }, [isOpen, project?.id, project?.currentAmountUSDC, project?.targetAmountUSDC, project?.fundsReleased, canClaimFunds]);
+
+  // ✅ UPDATED: Handle fund claiming through ProjectFactory
   const handleClaimFunds = async () => {
     if (!project?.id || !claimProjectFunds) return;
 
     try {
       setClaiming(true);
       
-      console.log('🔍 Starting claim process:', {
+      console.log('🔍 Starting claim process via ProjectFactory:', {
         projectId: project.id,
         claimFunctionType: typeof claimProjectFunds,
         canClaimFunctionType: typeof canClaimFunds
@@ -210,8 +213,8 @@ const FundClaimModal = ({ isOpen, onClose, project, onSuccess }) => {
         throw new Error('Funds cannot be claimed yet. Project may not be completed or funds already released.');
       }
       
-      // Step 2: Attempt the claim
-      console.log('🔍 Step 2: Attempting to claim funds...');
+      // Step 2: Attempt the claim via ProjectFactory.claimProjectFunds
+      console.log('🔍 Step 2: Attempting to claim funds via ProjectFactory...');
       console.log('🔍 Calling claimProjectFunds with projectId:', project.id);
       
       const result = await claimProjectFunds(project.id);
@@ -484,7 +487,7 @@ const FundClaimModal = ({ isOpen, onClose, project, onSuccess }) => {
                   </HStack>
                   
                   <Text fontSize="xs" color="blue.600" mt={2}>
-                    * Funds will be transferred directly to your connected wallet
+                    * Funds will be transferred directly to your connected wallet via ProjectFactory
                   </Text>
                   
                   {/* ✅ Add precision notice if not exactly 100% */}
@@ -528,7 +531,7 @@ const FundClaimModal = ({ isOpen, onClose, project, onSuccess }) => {
                 leftIcon={<FaCheckCircle />}
                 onClick={handleClaimFunds}
                 isLoading={claiming}
-                loadingText="Claiming Funds..."
+                loadingText="Claiming via ProjectFactory..."
                 size="lg"
               >
                 Claim {formatNumber(raisedAmount, 2)} USDC

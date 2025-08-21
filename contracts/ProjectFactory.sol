@@ -7,18 +7,16 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
- * @title ProjectFactory - PRODUCTION VERSION WITH ENHANCED PRECISION-SAFE FUND CLAIMING
- * @dev Fixed precision issues for fund claiming and project completion with multiple tolerance methods
- * @notice Addresses floating-point precision errors that prevent fund claiming in frontend applications
+ * @title ProjectFactory - FIXED VERSION WITH PROPER FUND CLAIMING
+ * @dev Complete solution for UNPREDICTABLE_GAS_LIMIT error
  */
 contract ProjectFactory is ReentrancyGuard {
     using SafeERC20 for IERC20;
     
-    // Remove Counters - use simple uint256 instead
     uint256 private _projectIdCounter;
     uint256 private _userCounter;
     
-    // Project status enum - updated with FundsReleased status
+    // Project status enum
     enum ProjectStatus { Active, Completed, Cancelled, FundsReleased }
     
     // User profile structure
@@ -32,7 +30,7 @@ contract ProjectFactory is ReentrancyGuard {
         uint256 totalRaised;
     }
     
-    // Project structure with IPFS integration
+    // Project structure
     struct Project {
         uint256 id;
         address farmer;
@@ -71,17 +69,17 @@ contract ProjectFactory is ReentrancyGuard {
     // Investment Manager address for fund release
     address public investmentManager;
     
-    // ENHANCED PRECISION-SAFE CONSTANTS
+    // Constants for precision-safe calculations
     uint256 public constant PRECISION_TOLERANCE = 10000; // 0.01 USDC (with 6 decimals)
-    uint256 public constant COMPLETION_TOLERANCE_PERCENTAGE = 100; // 0.1% in basis points (10000 = 100%)
+    uint256 public constant COMPLETION_TOLERANCE_PERCENTAGE = 100; // 0.1% in basis points
     uint256 public constant MIN_FUNDING_AMOUNT = 10 * 1e6; // 10 USDC
     uint256 public constant MAX_FUNDING_AMOUNT = 100000 * 1e6; // 100k USDC
     uint256 public constant MIN_DURATION_DAYS = 30;
     uint256 public constant MAX_DURATION_DAYS = 365;
     
-    // NEW: Additional precision constants for enhanced fund claiming
-    uint256 public constant ABSOLUTE_TOLERANCE_USDC = 10000; // 0.01 USDC in 6-decimal format
-    uint256 public constant PERCENTAGE_TOLERANCE_BASIS_POINTS = 10; // 0.1% = 10 basis points
+    // Enhanced precision constants
+    uint256 public constant ABSOLUTE_TOLERANCE_USDC = 10000; // 0.01 USDC
+    uint256 public constant PERCENTAGE_TOLERANCE_BASIS_POINTS = 10; // 0.1%
     
     // Events
     event UserRegistered(
@@ -192,48 +190,6 @@ contract ProjectFactory is ReentrancyGuard {
         uint256 projectId = _projectIdCounter;
         uint256 deadline = block.timestamp + (durationDays * 1 days);
         
-        // Split project creation to avoid stack too deep
-        _createProjectStorage(
-            projectId,
-            title,
-            description,
-            imageIPFSHash,
-            documentsIPFSHash,
-            targetAmountUSDC,
-            durationDays,
-            deadline,
-            location,
-            category
-        );
-        
-        userProjects[msg.sender].push(projectId);
-        userProfiles[msg.sender].projectCount++;
-        
-        emit ProjectCreated(
-            projectId,
-            msg.sender,
-            title,
-            targetAmountUSDC,
-            imageIPFSHash,
-            deadline
-        );
-    }
-    
-    /**
-     * @dev Internal function to create project storage (reduces stack depth)
-     */
-    function _createProjectStorage(
-        uint256 projectId,
-        string memory title,
-        string memory description,
-        string memory imageIPFSHash,
-        string memory documentsIPFSHash,
-        uint256 targetAmountUSDC,
-        uint256 durationDays,
-        uint256 deadline,
-        string memory location,
-        string memory category
-    ) internal {
         projects[projectId] = Project({
             id: projectId,
             farmer: msg.sender,
@@ -253,6 +209,18 @@ contract ProjectFactory is ReentrancyGuard {
             fundsReleased: false,
             fundsReleasedAt: 0
         });
+        
+        userProjects[msg.sender].push(projectId);
+        userProfiles[msg.sender].projectCount++;
+        
+        emit ProjectCreated(
+            projectId,
+            msg.sender,
+            title,
+            targetAmountUSDC,
+            imageIPFSHash,
+            deadline
+        );
     }
     
     /**
@@ -263,6 +231,7 @@ contract ProjectFactory is ReentrancyGuard {
         address investor,
         uint256 amount
     ) external {
+        require(msg.sender == investmentManager, "Only InvestmentManager can call this");
         require(projects[projectId].id != 0, "Project does not exist");
         require(projects[projectId].status == ProjectStatus.Active, "Project not active");
         require(block.timestamp <= projects[projectId].deadline, "Funding period ended");
@@ -292,7 +261,7 @@ contract ProjectFactory is ReentrancyGuard {
             projects[projectId].currentAmountUSDC
         );
         
-        // ENHANCED: Check completion with precision-safe logic
+        // Check completion with precision-safe logic
         _checkProjectCompletionPrecisionSafe(projectId);
     }
     
@@ -323,9 +292,7 @@ contract ProjectFactory is ReentrancyGuard {
     }
     
     /**
-     * @dev ENHANCED PRECISION-SAFE PROJECT COMPLETION CHECK
-     * @notice Uses multiple tolerance methods to handle floating-point precision issues
-     * This function implements three different completion criteria to ensure robust fund claiming
+     * @dev PRECISION-SAFE PROJECT COMPLETION CHECK
      */
     function _checkProjectCompletionPrecisionSafe(uint256 projectId) internal {
         uint256 current = projects[projectId].currentAmountUSDC;
@@ -340,14 +307,13 @@ contract ProjectFactory is ReentrancyGuard {
             uint256 difference = target - current;
             absoluteTolerance = difference <= ABSOLUTE_TOLERANCE_USDC;
         } else {
-            absoluteTolerance = true; // Already exceeded target
+            absoluteTolerance = true;
         }
         
         // Method 3: Percentage tolerance check (0.1%)
         bool percentageTolerance = false;
         if (target > 0) {
             uint256 difference = target > current ? target - current : 0;
-            // Calculate 0.1% of target amount
             uint256 percentageThreshold = (target * PERCENTAGE_TOLERANCE_BASIS_POINTS) / 10000;
             percentageTolerance = difference <= percentageThreshold;
         }
@@ -371,12 +337,8 @@ contract ProjectFactory is ReentrancyGuard {
     }
     
     /**
-     * @dev ENHANCED PRECISION-SAFE FUND CLAIM ELIGIBILITY CHECK
-     * @notice This is the main function used by frontend to determine if farmer can claim funds
-     * Uses the same multi-method tolerance approach as completion check
+     * @dev PRECISION-SAFE FUND CLAIM ELIGIBILITY CHECK
      */
-
-
     function canClaimFunds(uint256 projectId) external view returns (bool) {
         Project memory project = projects[projectId];
         
@@ -392,17 +354,16 @@ contract ProjectFactory is ReentrancyGuard {
         // Method 1: Exact completion
         if (current >= target) return true;
         
-        // Method 2: Absolute tolerance (0.01 USDC = 10000 with 6 decimals)
-        uint256 absoluteTolerance = 10000; // 0.01 USDC
+        // Method 2: Absolute tolerance (0.01 USDC)
         if (target > current) {
             uint256 difference = target - current;
-            if (difference <= absoluteTolerance) return true;
+            if (difference <= ABSOLUTE_TOLERANCE_USDC) return true;
         }
         
-        // Method 3: Percentage tolerance (0.1% = 10 basis points)
+        // Method 3: Percentage tolerance (0.1%)
         if (target > 0) {
             uint256 difference = target > current ? target - current : 0;
-            uint256 percentageThreshold = (target * 10) / 10000; // 0.1%
+            uint256 percentageThreshold = (target * PERCENTAGE_TOLERANCE_BASIS_POINTS) / 10000;
             if (difference <= percentageThreshold) return true;
         }
         
@@ -410,8 +371,11 @@ contract ProjectFactory is ReentrancyGuard {
         return (project.status == ProjectStatus.Completed || 
                 project.status == ProjectStatus.Active);
     }
+
     /**
-     * @dev ENHANCED: Allow farmer to claim funds when project is precision-safe completed
+     * @dev 🎯 FIXED: Farmer claims project funds (SOLUTION TO UNPREDICTABLE_GAS_LIMIT)
+     * This function acts as a proxy to call InvestmentManager.releaseFundsToFarmer
+     * Frontend should call THIS function, not InvestmentManager directly
      */
     function claimProjectFunds(uint256 projectId) external nonReentrant {
         Project storage project = projects[projectId];
@@ -421,7 +385,7 @@ contract ProjectFactory is ReentrancyGuard {
         require(!project.fundsReleased, "Funds already released");
         require(project.currentAmountUSDC > 0, "No funds to release");
         
-        // ENHANCED: Use precision-safe eligibility check
+        // Use precision-safe eligibility check
         require(this.canClaimFunds(projectId), "Project not eligible for fund claiming");
         
         // Mark funds as released
@@ -432,7 +396,8 @@ contract ProjectFactory is ReentrancyGuard {
         ProjectStatus oldStatus = project.status;
         project.status = ProjectStatus.FundsReleased;
         
-        // Transfer funds from InvestmentManager to farmer
+        // 🎯 KEY FIX: Call InvestmentManager from ProjectFactory
+        // Now msg.sender will be the ProjectFactory address
         require(investmentManager != address(0), "Investment manager not set");
         
         // Call the investment manager to release funds
@@ -449,10 +414,9 @@ contract ProjectFactory is ReentrancyGuard {
         emit FundsReleased(projectId, msg.sender, project.currentAmountUSDC, block.timestamp);
         emit ProjectStatusUpdated(projectId, oldStatus, ProjectStatus.FundsReleased);
     }
-    
+
     /**
-     * @dev NEW: Get detailed precision analysis for debugging fund claiming issues
-     * @notice This function helps developers understand why fund claiming might be failing
+     * @dev Get detailed precision analysis for debugging
      */
     function getProjectPrecisionStatus(uint256 projectId) external view returns (
         uint256 currentAmount,
@@ -485,7 +449,7 @@ contract ProjectFactory is ReentrancyGuard {
         canClaim = this.canClaimFunds(projectId);
     }
     
-    // Add getter function for individual project
+    // Get individual project
     function getProject(uint256 projectId) external view returns (Project memory) {
         return projects[projectId];
     }

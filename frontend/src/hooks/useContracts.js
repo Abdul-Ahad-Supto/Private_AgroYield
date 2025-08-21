@@ -1,4 +1,4 @@
-// frontend/src/hooks/useContracts.js - FIXED VERSION WITH PRECISION-SAFE FUND CLAIMING
+// frontend/src/hooks/useContracts.js - UPDATED FOR PROJECTFACTORY FUND CLAIMING
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { ethers } from 'ethers';
 import { useToast } from '@chakra-ui/react';
@@ -473,7 +473,7 @@ export const useContracts = () => {
     }
   }, [contractsReady, contracts.investmentManager, contracts.usdc, isConnected, account, toast, clearProjectCache]);
 
-  // FIXED: Precision-safe fund claiming check
+  // ✅ UPDATED: Fund claiming through ProjectFactory (not InvestmentManager)
   const canClaimFunds = useCallback(async (projectId) => {
     if (!contractsReady || !contracts.projectFactory || !projectId) {
       return false;
@@ -522,6 +522,7 @@ export const useContracts = () => {
     }
   }, [contractsReady, contracts.projectFactory]);
 
+  // ✅ UPDATED: Claim funds through ProjectFactory.claimProjectFunds (NOT InvestmentManager.releaseFundsToFarmer)
   const claimProjectFunds = useCallback(async (projectId) => {
     if (!contractsReady || !contracts.projectFactory || !isConnected) {
       throw new Error('Wallet not connected or contracts not ready');
@@ -547,8 +548,11 @@ export const useContracts = () => {
         throw new Error('Funds cannot be claimed yet. Project may not be completed or funds already released.');
       }
       
+      // ✅ FIXED: Call ProjectFactory.claimProjectFunds (not InvestmentManager)
       console.log('🔍 Calling contracts.projectFactory.claimProjectFunds...');
-      const tx = await contracts.projectFactory.claimProjectFunds(projectId);
+      const tx = await contracts.projectFactory.claimProjectFunds(projectId, {
+        gasLimit: 300000 // Explicit gas limit to prevent estimation issues
+      });
       console.log('🔍 Transaction sent:', tx.hash);
       
       console.log('🔍 Waiting for transaction confirmation...');
@@ -588,6 +592,103 @@ export const useContracts = () => {
       setLoading(false);
     }
   }, [contractsReady, contracts.projectFactory, isConnected, toast, clearProjectCache, canClaimFunds]);
+
+  // ✅ NEW: Claim investor returns (via InvestmentManager)
+  const claimInvestorReturns = useCallback(async (projectId) => {
+    if (!contractsReady || !contracts.investmentManager || !isConnected) {
+      throw new Error('Wallet not connected or contracts not ready');
+    }
+
+    try {
+      setLoading(true);
+      
+      console.log('🔍 Claiming investor returns for project:', projectId);
+      
+      // Check if returns are available
+      const returnInfo = await contracts.investmentManager.getInvestorProjectReturn(account, projectId);
+      if (!returnInfo.returnAmount || returnInfo.returnAmount === '0') {
+        throw new Error('No returns available for this project');
+      }
+      
+      if (returnInfo.claimed) {
+        throw new Error('Returns already claimed for this project');
+      }
+      
+      const tx = await contracts.investmentManager.claimProjectReturns(projectId, {
+        gasLimit: 200000
+      });
+      
+      const receipt = await tx.wait();
+      
+      toast({
+        title: 'Returns Claimed Successfully',
+        description: `Project returns have been transferred to your wallet`,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+      
+      return { tx, receipt };
+      
+    } catch (error) {
+      console.error('❌ Claim investor returns error:', error);
+      
+      toast({
+        title: 'Return Claim Failed',
+        description: error.reason || error.message,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [contractsReady, contracts.investmentManager, isConnected, account, toast]);
+
+  // ✅ NEW: Deposit returns as farmer (ETH)
+  const depositReturns = useCallback(async (projectId, returnAmountETH) => {
+    if (!contractsReady || !contracts.investmentManager || !isConnected) {
+      throw new Error('Wallet not connected or contracts not ready');
+    }
+
+    try {
+      setLoading(true);
+      
+      console.log('🔍 Depositing returns for project:', projectId, 'Amount:', returnAmountETH, 'ETH');
+      
+      const tx = await contracts.investmentManager.depositReturns(projectId, {
+        value: ethers.utils.parseEther(returnAmountETH.toString()),
+        gasLimit: 300000
+      });
+      
+      const receipt = await tx.wait();
+      
+      toast({
+        title: 'Returns Deposited Successfully',
+        description: `${returnAmountETH} ETH deposited as returns for investors`,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+      
+      return { tx, receipt };
+      
+    } catch (error) {
+      console.error('❌ Deposit returns error:', error);
+      
+      toast({
+        title: 'Return Deposit Failed',
+        description: error.reason || error.message,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [contractsReady, contracts.investmentManager, isConnected, toast]);
 
   // Get investment constraints
   const getInvestmentConstraints = useCallback(async (projectId) => {
@@ -690,9 +791,11 @@ export const useContracts = () => {
     getInvestorData,
     getInvestmentConstraints,
     
-    // FIXED: Precision-safe fund release functions
-    claimProjectFunds,
-    canClaimFunds,
+    // ✅ UPDATED: Fund claiming functions
+    claimProjectFunds,      // For farmers to claim USDC funds (via ProjectFactory)
+    claimInvestorReturns,   // For investors to claim ETH returns (via InvestmentManager)
+    depositReturns,         // For farmers to deposit ETH returns (via InvestmentManager)
+    canClaimFunds,          // Check if funds can be claimed
     
     // Platform functions
     getPlatformStats,
