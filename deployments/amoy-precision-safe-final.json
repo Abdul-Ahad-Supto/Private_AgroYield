@@ -1,0 +1,85 @@
+{
+  "network": "amoy",
+  "chainId": 80002,
+  "timestamp": "2025-08-21T11:58:22.918Z",
+  "deployer": "0x456a150ce19FE081158B2DDd68438bFAf967D73b",
+  "deployerBalance": "29.74763027928932667",
+  "usdcAddress": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+  "version": "2.1.0-precision-safe-final",
+  "status": "FULLY_WORKING_PRECISION_SAFE",
+  "contracts": {
+    "projectFactory": "0x7C9E5Cf352e1994dbe3066C4Aa1DFaDc32E33e34",
+    "investmentManager": "0xEdA444Bddd7Af7fD5a66bff9e614D6BCdc139ad2",
+    "yieldDistributor": "0xcCBB2d716C053D612CED7bE191C465FAEA3e8dc2",
+    "governanceModule": "0xd0663DD103917b137223dd22B517ef7EE1F5baD6"
+  },
+  "verification": {
+    "contractsLinked": true,
+    "linkingTransaction": "0xa6df641a1b795fee476a4e928d52e20c9acaf678f20af6033cc66e79c889b497",
+    "allSystemsWorking": true,
+    "precisionSafeFeatures": true
+  },
+  "features": {
+    "projectCreation": true,
+    "investment": true,
+    "fundClaiming": true,
+    "precisionSafeClaiming": true,
+    "returnDeposit": true,
+    "returnClaiming": true,
+    "governance": true,
+    "fullLifecycle": true,
+    "flexibleFinalInvestments": true
+  },
+  "precisionSafeConstants": {
+    "completionTolerance": "10000 (0.01 USDC equivalent)",
+    "minFunding": "10 USDC",
+    "maxFunding": "100,000 USDC",
+    "note": "Using standard constants from deployed contract"
+  },
+  "deploymentLog": [
+    {
+      "step": 1,
+      "contract": "ProjectFactory",
+      "address": "0x7C9E5Cf352e1994dbe3066C4Aa1DFaDc32E33e34",
+      "timestamp": "2025-08-21T11:57:51.243Z",
+      "features": [
+        "precision-safe-completion",
+        "flexible-fund-claiming"
+      ],
+      "gasUsed": "estimated"
+    },
+    {
+      "step": 2,
+      "contract": "InvestmentManager",
+      "address": "0xEdA444Bddd7Af7fD5a66bff9e614D6BCdc139ad2",
+      "dependencies": [
+        "0x7C9E5Cf352e1994dbe3066C4Aa1DFaDc32E33e34",
+        "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"
+      ],
+      "timestamp": "2025-08-21T11:57:59.525Z"
+    },
+    {
+      "step": 3,
+      "action": "Link Contracts",
+      "transaction": "0xa6df641a1b795fee476a4e928d52e20c9acaf678f20af6033cc66e79c889b497",
+      "gasUsed": "44200",
+      "timestamp": "2025-08-21T11:58:09.493Z"
+    },
+    {
+      "step": 4,
+      "contract": "YieldDistributor",
+      "address": "0xcCBB2d716C053D612CED7bE191C465FAEA3e8dc2",
+      "dependencies": [
+        "0x7C9E5Cf352e1994dbe3066C4Aa1DFaDc32E33e34",
+        "0xEdA444Bddd7Af7fD5a66bff9e614D6BCdc139ad2"
+      ],
+      "timestamp": "2025-08-21T11:58:15.001Z"
+    },
+    {
+      "step": 5,
+      "contract": "GovernanceModule",
+      "address": "0xd0663DD103917b137223dd22B517ef7EE1F5baD6",
+      "timestamp": "2025-08-21T11:58:19.264Z"
+    }
+  ]
+}

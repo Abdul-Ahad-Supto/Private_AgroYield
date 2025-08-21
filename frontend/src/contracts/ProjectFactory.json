@@ -192,7 +192,7 @@
   },
   {
     "inputs": [],
-    "name": "COMPLETION_TOLERANCE",
+    "name": "COMPLETION_TOLERANCE_PERCENTAGE",
     "outputs": [
       {
         "internalType": "uint256",
@@ -245,6 +245,19 @@
   {
     "inputs": [],
     "name": "MIN_FUNDING_AMOUNT",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "PRECISION_TOLERANCE",
     "outputs": [
       {
         "internalType": "uint256",
@@ -843,6 +856,55 @@
         "internalType": "struct ProjectFactory.Investment[]",
         "name": "",
         "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "projectId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getProjectPrecisionStatus",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "currentAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "targetAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "difference",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "exactCompletion",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "absoluteTolerance",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "percentageTolerance",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "canClaim",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",

@@ -1,12 +1,16 @@
 {
-  "projectFactory": "0x2481f765F70BC96055bf7D80E8B29bA9Deb88a82",
-  "investmentManager": "0x04d35ad5e6B03ADA061d4DBFC9139279877C685b",
-  "yieldDistributor": "0x8a51a9312587aC27c559E4BA9fA983C98dF9A8F4",
-  "governanceModule": "0x055cF168f0D2712007780AEe12F512183A258DE3",
+  "projectFactory": "0x7C9E5Cf352e1994dbe3066C4Aa1DFaDc32E33e34",
+  "investmentManager": "0xEdA444Bddd7Af7fD5a66bff9e614D6BCdc139ad2",
+  "yieldDistributor": "0xcCBB2d716C053D612CED7bE191C465FAEA3e8dc2",
+  "governanceModule": "0xd0663DD103917b137223dd22B517ef7EE1F5baD6",
   "network": "amoy",
   "chainId": 80002,
   "usdcAddress": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
   "rpcUrl": "https://rpc-amoy.polygon.technology",
   "explorerUrl": "https://amoy.polygonscan.com",
-  "version": "2.0.0-production-final"
+  "version": "2.1.0-precision-safe-final",
+  "features": {
+    "precisionSafeClaiming": true,
+    "flexibleFinalInvestments": true
+  }
 }

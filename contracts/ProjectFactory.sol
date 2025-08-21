@@ -7,8 +7,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
- * @title ProjectFactory - Updated with Fund Release Mechanism
- * @dev Fully decentralized project creation with IPFS integration and fund release
+ * @title ProjectFactory - PRODUCTION VERSION WITH PRECISION-SAFE COMPLETION
+ * @dev Fixed precision issues for fund claiming and project completion
+ * @notice Addresses floating-point precision errors that prevent fund claiming
  */
 contract ProjectFactory is ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -49,7 +50,7 @@ contract ProjectFactory is ReentrancyGuard {
         string category;
         uint256 investorCount;
         bool fundsReleased;
-        uint256 fundsReleasedAt; // NEW: Track when funds were released
+        uint256 fundsReleasedAt;
     }
     
     // Investment tracking
@@ -67,11 +68,12 @@ contract ProjectFactory is ReentrancyGuard {
     mapping(uint256 => Investment[]) public projectInvestments;
     mapping(address => uint256[]) public userInvestments;
     
-    // NEW: Investment Manager address for fund release
+    // Investment Manager address for fund release
     address public investmentManager;
     
-    // Platform constants
-    uint256 public constant COMPLETION_TOLERANCE = 1e4;
+    // PRODUCTION FIX: Precision-safe completion constants
+    uint256 public constant PRECISION_TOLERANCE = 10000; // 0.01 USDC (with 6 decimals)
+    uint256 public constant COMPLETION_TOLERANCE_PERCENTAGE = 100; // 0.1% in basis points (10000 = 100%)
     uint256 public constant MIN_FUNDING_AMOUNT = 10 * 1e6; // 10 USDC
     uint256 public constant MAX_FUNDING_AMOUNT = 100000 * 1e6; // 100k USDC
     uint256 public constant MIN_DURATION_DAYS = 30;
@@ -107,7 +109,6 @@ contract ProjectFactory is ReentrancyGuard {
         uint256 investorCount
     );
     
-    // NEW: Fund release events
     event FundsReleased(
         uint256 indexed projectId,
         address indexed farmer,
@@ -115,7 +116,6 @@ contract ProjectFactory is ReentrancyGuard {
         uint256 timestamp
     );
     
-    // NEW: Status update event
     event ProjectStatusUpdated(
         uint256 indexed projectId,
         ProjectStatus oldStatus,
@@ -288,8 +288,8 @@ contract ProjectFactory is ReentrancyGuard {
             projects[projectId].currentAmountUSDC
         );
         
-        // Check if fully funded
-        _checkProjectCompletion(projectId);
+        // PRODUCTION FIX: Check completion with precision-safe logic
+        _checkProjectCompletionPrecisionSafe(projectId);
     }
     
     /**
@@ -319,40 +319,98 @@ contract ProjectFactory is ReentrancyGuard {
     }
     
     /**
-    * @dev Internal function to check if project is fully funded - FIXED VERSION
-    */
-    function _checkProjectCompletion(uint256 projectId) internal {
+     * @dev PRODUCTION FIX: Precision-safe project completion check
+     * @notice Uses multiple tolerance methods to handle floating-point precision issues
+     */
+    function _checkProjectCompletionPrecisionSafe(uint256 projectId) internal {
         uint256 current = projects[projectId].currentAmountUSDC;
         uint256 target = projects[projectId].targetAmountUSDC;
         
-        // Complete if within tolerance (handles rounding from fees/decimals)
-        if (current >= target || (target - current) <= COMPLETION_TOLERANCE) {
+        // Method 1: Exact completion
+        bool exactCompletion = current >= target;
+        
+        // Method 2: Absolute tolerance (0.01 USDC)
+        bool absoluteTolerance = target > current ? 
+            (target - current) <= PRECISION_TOLERANCE : true;
+        
+        // Method 3: Percentage tolerance (0.1%)
+        bool percentageTolerance = false;
+        if (target > 0) {
+            uint256 difference = target > current ? target - current : 0;
+            uint256 percentageThreshold = (target * COMPLETION_TOLERANCE_PERCENTAGE) / 1000000; // 0.1%
+            percentageTolerance = difference <= percentageThreshold;
+        }
+        
+        // Project is complete if any tolerance method passes
+        bool isComplete = exactCompletion || absoluteTolerance || percentageTolerance;
+        
+        if (isComplete && projects[projectId].status == ProjectStatus.Active) {
             ProjectStatus oldStatus = projects[projectId].status;
             projects[projectId].status = ProjectStatus.Completed;
-            userProfiles[projects[projectId].farmer].totalRaised += projects[projectId].currentAmountUSDC;
+            userProfiles[projects[projectId].farmer].totalRaised += current;
             
             emit ProjectCompleted(
                 projectId,
-                projects[projectId].currentAmountUSDC,
+                current,
                 projects[projectId].investorCount
             );
             
             emit ProjectStatusUpdated(projectId, oldStatus, ProjectStatus.Completed);
         }
     }
-
     
     /**
-     * @dev NEW: Allow farmer to claim funds when project is completed
+     * @dev PRODUCTION FIX: Precision-safe fund claim eligibility check
+     */
+    function canClaimFunds(uint256 projectId) external view returns (bool) {
+        Project memory project = projects[projectId];
+        
+        // Basic checks
+        if (project.id == 0 || project.fundsReleased || project.currentAmountUSDC == 0) {
+            return false;
+        }
+        
+        // PRODUCTION FIX: Use same precision-safe logic as completion check
+        uint256 current = project.currentAmountUSDC;
+        uint256 target = project.targetAmountUSDC;
+        
+        // Method 1: Exact completion
+        bool exactCompletion = current >= target;
+        
+        // Method 2: Absolute tolerance (0.01 USDC)
+        bool absoluteTolerance = target > current ? 
+            (target - current) <= PRECISION_TOLERANCE : true;
+        
+        // Method 3: Percentage tolerance (0.1%)
+        bool percentageTolerance = false;
+        if (target > 0) {
+            uint256 difference = target > current ? target - current : 0;
+            uint256 percentageThreshold = (target * COMPLETION_TOLERANCE_PERCENTAGE) / 1000000;
+            percentageTolerance = difference <= percentageThreshold;
+        }
+        
+        bool isNearlyComplete = exactCompletion || absoluteTolerance || percentageTolerance;
+        
+        // Must be nearly complete AND in completed status
+        return isNearlyComplete && (
+            project.status == ProjectStatus.Completed || 
+            project.status == ProjectStatus.Active // Allow claiming for active projects that are precision-complete
+        );
+    }
+    
+    /**
+     * @dev PRODUCTION FIX: Allow farmer to claim funds when project is completed
      */
     function claimProjectFunds(uint256 projectId) external nonReentrant {
         Project storage project = projects[projectId];
         
         require(project.id != 0, "Project does not exist");
         require(project.farmer == msg.sender, "Only project farmer can claim funds");
-        require(project.status == ProjectStatus.Completed, "Project not completed");
         require(!project.fundsReleased, "Funds already released");
         require(project.currentAmountUSDC > 0, "No funds to release");
+        
+        // PRODUCTION FIX: Use precision-safe eligibility check
+        require(this.canClaimFunds(projectId), "Project not eligible for fund claiming");
         
         // Mark funds as released
         project.fundsReleased = true;
@@ -378,19 +436,6 @@ contract ProjectFactory is ReentrancyGuard {
         
         emit FundsReleased(projectId, msg.sender, project.currentAmountUSDC, block.timestamp);
         emit ProjectStatusUpdated(projectId, oldStatus, ProjectStatus.FundsReleased);
-    }
-    
-    /**
-     * @dev NEW: Check if project funds can be claimed
-     */
-    function canClaimFunds(uint256 projectId) external view returns (bool) {
-        Project memory project = projects[projectId];
-        return (
-            project.id != 0 &&
-            project.status == ProjectStatus.Completed &&
-            !project.fundsReleased &&
-            project.currentAmountUSDC >= project.targetAmountUSDC
-        );
     }
     
     // Add getter function for individual project
@@ -433,9 +478,6 @@ contract ProjectFactory is ReentrancyGuard {
         return activeProjects;
     }
     
-    /**
-     * @dev NEW: Get completed projects that haven't released funds yet
-     */
     function getCompletedProjects() external view returns (Project[] memory) {
         uint256 completedCount = 0;
         
@@ -504,5 +546,33 @@ contract ProjectFactory is ReentrancyGuard {
     
     function getTotalProjects() external view returns (uint256) {
         return _projectIdCounter;
+    }
+    
+    /**
+     * @dev PRODUCTION FIX: Get precision status for debugging
+     */
+    function getProjectPrecisionStatus(uint256 projectId) external view returns (
+        uint256 currentAmount,
+        uint256 targetAmount,
+        uint256 difference,
+        bool exactCompletion,
+        bool absoluteTolerance,
+        bool percentageTolerance,
+        bool canClaim
+    ) {
+        Project memory project = projects[projectId];
+        currentAmount = project.currentAmountUSDC;
+        targetAmount = project.targetAmountUSDC;
+        difference = targetAmount > currentAmount ? targetAmount - currentAmount : 0;
+        
+        exactCompletion = currentAmount >= targetAmount;
+        absoluteTolerance = difference <= PRECISION_TOLERANCE;
+        
+        if (targetAmount > 0) {
+            uint256 percentageThreshold = (targetAmount * COMPLETION_TOLERANCE_PERCENTAGE) / 1000000;
+            percentageTolerance = difference <= percentageThreshold;
+        }
+        
+        canClaim = this.canClaimFunds(projectId);
     }
 }

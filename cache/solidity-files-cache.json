@@ -423,8 +423,8 @@
       ]
     },
     "C:\\Users\\USER\\Documents\\AgroYield-Working\\Private_AgroYield\\contracts\\ProjectFactory.sol": {
-      "lastModificationDate": 1755773669350,
-      "contentHash": "65acf459b3608c054b6551feba117f99",
+      "lastModificationDate": 1755775414567,
+      "contentHash": "066495ee9f1b6d482ed880e74caefb7c",
       "sourceName": "contracts/ProjectFactory.sol",
       "solcConfig": {
         "version": "0.8.20",
