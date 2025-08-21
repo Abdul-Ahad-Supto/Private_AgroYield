@@ -1,0 +1,12 @@
+{
+  "projectFactory": "0x2Ef0EE2aA43beE5dd105E3Cc43E3904342bD4a09",
+  "investmentManager": "0x83492171d3A52f7BBa66ddECA9B3FA57dC1EB3ad",
+  "yieldDistributor": "0x4dDD485bfA21feD1a6A1fADD4f1DEcb0C1BBE3D5",
+  "governanceModule": "0x6fa4980bcbd4D36f359a1A965c26f9DD76196662",
+  "network": "amoy",
+  "chainId": 80002,
+  "usdcAddress": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+  "rpcUrl": "https://rpc-amoy.polygon.technology",
+  "explorerUrl": "https://amoy.polygonscan.com",
+  "version": "2.0.0-complete-fixed"
+}

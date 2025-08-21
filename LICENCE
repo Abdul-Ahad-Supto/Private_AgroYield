@@ -1,0 +1,53 @@
+MIT License
+
+Copyright (c) 2025 AgroYield
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Additional Terms for Smart Contracts
+
+This software includes smart contracts deployed on blockchain networks. Users are responsible for:
+
+1. **Gas Fees**: All transaction costs associated with smart contract interactions
+2. **Security**: Proper handling of private keys and wallet security
+3. **Compliance**: Ensuring compliance with local laws and regulations
+4. **Risk Assessment**: Understanding the risks associated with DeFi and cryptocurrency investments
+
+## Third-Party Dependencies
+
+This project uses several open-source libraries and frameworks:
+
+- **OpenZeppelin Contracts**: Licensed under MIT License
+- **React.js**: Licensed under MIT License  
+- **Hardhat**: Licensed under MIT License
+- **Chakra UI**: Licensed under MIT License
+
+See individual package licenses in node_modules for complete terms.
+
+## Disclaimer
+
+THE AUTHORS AND CONTRIBUTORS OF THIS SOFTWARE ARE NOT RESPONSIBLE FOR:
+- Financial losses from using this platform
+- Smart contract vulnerabilities or exploits
+- Market volatility or investment risks
+- Regulatory compliance in your jurisdiction
+
+USE AT YOUR OWN RISK. This software is provided for educational and experimental purposes.

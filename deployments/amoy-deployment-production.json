@@ -1,0 +1,14 @@
+{
+  "network": "amoy",
+  "chainId": 80002,
+  "timestamp": "2025-08-19T16:21:08.210Z",
+  "deployer": "0x456a150ce19FE081158B2DDd68438bFAf967D73b",
+  "usdcAddress": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+  "version": "2.0.0-production",
+  "contracts": {
+    "projectFactory": "0xCE09305C7998BD138550250d28e65a001162Fc56",
+    "investmentManager": "0xe1011dFA6f5bFC2213dac0673670788966b82684",
+    "yieldDistributor": "0xB55caedadA3C3616CDcae4D9247D613831E76768",
+    "governanceModule": "0x8b8f94fFE1f9Ff8aE07C4Bc8Cd629D0edcc003E8"
+  }
+}

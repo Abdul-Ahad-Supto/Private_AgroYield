@@ -1,0 +1,73 @@
+{
+  "network": "amoy",
+  "chainId": 80002,
+  "timestamp": "2025-08-21T09:19:58.265Z",
+  "deployer": "0x456a150ce19FE081158B2DDd68438bFAf967D73b",
+  "deployerBalance": "31.326118364205666578",
+  "usdcAddress": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+  "version": "2.0.0-complete-fixed",
+  "deploymentType": "full-platform",
+  "contracts": {
+    "projectFactory": "0x2Ef0EE2aA43beE5dd105E3Cc43E3904342bD4a09",
+    "investmentManager": "0x83492171d3A52f7BBa66ddECA9B3FA57dC1EB3ad",
+    "yieldDistributor": "0x4dDD485bfA21feD1a6A1fADD4f1DEcb0C1BBE3D5",
+    "governanceModule": "0x6fa4980bcbd4D36f359a1A965c26f9DD76196662"
+  },
+  "contractLinks": {
+    "ProjectFactory → InvestmentManager": "0x83492171d3A52f7BBa66ddECA9B3FA57dC1EB3ad",
+    "InvestmentManager → ProjectFactory": "0x2Ef0EE2aA43beE5dd105E3Cc43E3904342bD4a09",
+    "YieldDistributor → ProjectFactory": "0x2Ef0EE2aA43beE5dd105E3Cc43E3904342bD4a09",
+    "YieldDistributor → InvestmentManager": "0x83492171d3A52f7BBa66ddECA9B3FA57dC1EB3ad"
+  },
+  "features": {
+    "projectCreation": true,
+    "flexibleInvestments": true,
+    "automaticCompletion": true,
+    "fundRelease": true,
+    "farmerClaims": true,
+    "yieldDistribution": true,
+    "governance": true,
+    "fullLifecycle": true
+  },
+  "deploymentLog": [
+    {
+      "step": 1,
+      "contract": "ProjectFactory",
+      "address": "0x2Ef0EE2aA43beE5dd105E3Cc43E3904342bD4a09",
+      "timestamp": "2025-08-21T09:19:16.424Z"
+    },
+    {
+      "step": 2,
+      "contract": "InvestmentManager",
+      "address": "0x83492171d3A52f7BBa66ddECA9B3FA57dC1EB3ad",
+      "dependencies": [
+        "0x2Ef0EE2aA43beE5dd105E3Cc43E3904342bD4a09",
+        "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"
+      ],
+      "timestamp": "2025-08-21T09:19:24.284Z"
+    },
+    {
+      "step": 3,
+      "action": "Link Contracts",
+      "transaction": "0xf7d7746693b4c381b8f5b3ecc4234478da2c69a0ae9f4184ac9b1104694a9ea7",
+      "gasUsed": "44156",
+      "timestamp": "2025-08-21T09:19:35.008Z"
+    },
+    {
+      "step": 4,
+      "contract": "YieldDistributor",
+      "address": "0x4dDD485bfA21feD1a6A1fADD4f1DEcb0C1BBE3D5",
+      "dependencies": [
+        "0x2Ef0EE2aA43beE5dd105E3Cc43E3904342bD4a09",
+        "0x83492171d3A52f7BBa66ddECA9B3FA57dC1EB3ad"
+      ],
+      "timestamp": "2025-08-21T09:19:43.913Z"
+    },
+    {
+      "step": 5,
+      "contract": "GovernanceModule",
+      "address": "0x6fa4980bcbd4D36f359a1A965c26f9DD76196662",
+      "timestamp": "2025-08-21T09:19:51.475Z"
+    }
+  ]
+}

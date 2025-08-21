@@ -1,0 +1,71 @@
+{
+  "name": "agroyield-frontend",
+  "version": "2.0.0",
+  "description": "AgroYield Frontend - Fully Decentralized Agriculture Investment Platform",
+  "private": true,
+  "homepage": ".",
+  "dependencies": {
+    "@chakra-ui/icons": "^2.2.4",
+    "@chakra-ui/react": "^2.10.9",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@testing-library/jest-dom": "^6.1.4",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/user-event": "^14.5.1",
+    "@web3-storage/upload-client": "^11.0.0",
+    "ethers": "^5.7.2",
+    "framer-motion": "^10.18.0",
+    "ipfs-http-client": "^60.0.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.45.4",
+    "react-icons": "^4.12.0",
+    "react-router-dom": "^6.30.1",
+    "react-script": "^2.0.5",
+    "react-scripts": "^5.0.1",
+    "web-vitals": "^3.5.0",
+    "web3": "^4.16.0",
+    "web3.storage": "^4.5.5"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
+    "lint:fix": "eslint src --ext .js,.jsx,.ts,.tsx --fix",
+    "format": "prettier --write src/**/*.{js,jsx,ts,tsx,json,css,md}",
+    "analyze": "npm run build && npx source-map-explorer 'build/static/js/*.js'",
+    "deploy:contracts": "cd .. && npx hardhat run scripts/deploy.js --network amoy",
+    "generate:abis": "cd .. && node scripts/generate-abis.js"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ],
+    "rules": {
+      "no-unused-vars": "warn",
+      "no-console": "warn"
+    }
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.21",
+    "@types/react-dom": "^18.2.7",
+    "eslint": "^8.48.0",
+    "prettier": "^3.0.3",
+    "source-map-explorer": "^2.5.3"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "network": "amoy",
+  "chainId": 80002,
+  "timestamp": "2025-08-20T22:34:47.613Z",
+  "deployer": "0x456a150ce19FE081158B2DDd68438bFAf967D73b",
+  "usdcAddress": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+  "version": "2.1.0-enhanced-investment",
+  "enhancement": "Fixed final investment issue with dynamic minimum and auto-refunds",
+  "contracts": {
+    "projectFactory": "0x00f71B4F9C97060Cb2851E6d8374E6985d36a8a2",
+    "investmentManager": "0xC6eCB4568ea2f460d16E42Db6b66be8e721C6b67",
+    "yieldDistributor": "0x478FC4B2fE227AC29cD42DC5aa5F738E0245D8Cd",
+    "governanceModule": "0x096C0C8FfD723B8DCee65838626aFf43C103d99f"
+  },
+  "newFeatures": [
+    "Dynamic minimum investment (can be less than 10 USDC for final investments)",
+    "Automatic refund for over-investments that complete projects",
+    "Project completion detection and special handling",
+    "Enhanced investment constraint checking",
+    "Improved user experience for final investments"
+  ]
+}
