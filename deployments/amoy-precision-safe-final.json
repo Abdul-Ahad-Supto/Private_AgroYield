@@ -1,21 +1,21 @@
 {
   "network": "amoy",
   "chainId": 80002,
-  "timestamp": "2025-08-21T21:22:50.475Z",
+  "timestamp": "2025-08-22T09:54:29.299Z",
   "deployer": "0xBF27545DA45F8c39907abf1617152F0C457ed8cc",
-  "deployerBalance": "4.715792622081997116",
+  "deployerBalance": "1.543089662165856391",
   "usdcAddress": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
   "version": "2.1.0-precision-safe-final",
   "status": "FULLY_WORKING_PRECISION_SAFE",
   "contracts": {
-    "projectFactory": "0xAd723852eC2AeB9e180a02319888937665304584",
-    "investmentManager": "0xaF2Fd072631FbB58db87c0534a8bCBBFe58dC57c",
-    "yieldDistributor": "0x2eab322f6DFbEB9133B33C4F1A44d14563b0b2Fa",
-    "governanceModule": "0x28eEEaB79543283ba994F80C67aEe5125fF218c5"
+    "projectFactory": "0x5d82905AcC8fD9730C56a3DAeAa08dBCe10d7169",
+    "investmentManager": "0x9952E59eAe73B48E298eD504028f8bDd168863B9",
+    "yieldDistributor": "0xBea293f70c2C5b87c61d49ccc0f76FBa902f350D",
+    "governanceModule": "0x23E2F185d052Cc85De5299953709D5F7039820B0"
   },
   "verification": {
     "contractsLinked": true,
-    "linkingTransaction": "0x07b69d5df6648b44aafc915d74298064dc39c6da5ba2aecfa2a2d5da43824d26",
+    "linkingTransaction": "0xb1b1f7d78ba68a5f9c424171f83b166a139bbc9a957872d764cc9e1f68019cfb",
     "allSystemsWorking": true,
     "precisionSafeFeatures": true
   },
@@ -40,8 +40,8 @@
     {
       "step": 1,
       "contract": "ProjectFactory",
-      "address": "0xAd723852eC2AeB9e180a02319888937665304584",
-      "timestamp": "2025-08-21T21:22:15.405Z",
+      "address": "0x5d82905AcC8fD9730C56a3DAeAa08dBCe10d7169",
+      "timestamp": "2025-08-22T09:53:54.491Z",
       "features": [
         "precision-safe-completion",
         "flexible-fund-claiming"
@@ -51,35 +51,35 @@
     {
       "step": 2,
       "contract": "InvestmentManager",
-      "address": "0xaF2Fd072631FbB58db87c0534a8bCBBFe58dC57c",
+      "address": "0x9952E59eAe73B48E298eD504028f8bDd168863B9",
       "dependencies": [
-        "0xAd723852eC2AeB9e180a02319888937665304584",
+        "0x5d82905AcC8fD9730C56a3DAeAa08dBCe10d7169",
         "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"
       ],
-      "timestamp": "2025-08-21T21:22:24.124Z"
+      "timestamp": "2025-08-22T09:54:03.523Z"
     },
     {
       "step": 3,
       "action": "Link Contracts",
-      "transaction": "0x07b69d5df6648b44aafc915d74298064dc39c6da5ba2aecfa2a2d5da43824d26",
-      "gasUsed": "44208",
-      "timestamp": "2025-08-21T21:22:35.589Z"
+      "transaction": "0xb1b1f7d78ba68a5f9c424171f83b166a139bbc9a957872d764cc9e1f68019cfb",
+      "gasUsed": "44186",
+      "timestamp": "2025-08-22T09:54:14.508Z"
     },
     {
       "step": 4,
       "contract": "YieldDistributor",
-      "address": "0x2eab322f6DFbEB9133B33C4F1A44d14563b0b2Fa",
+      "address": "0xBea293f70c2C5b87c61d49ccc0f76FBa902f350D",
       "dependencies": [
-        "0xAd723852eC2AeB9e180a02319888937665304584",
-        "0xaF2Fd072631FbB58db87c0534a8bCBBFe58dC57c"
+        "0x5d82905AcC8fD9730C56a3DAeAa08dBCe10d7169",
+        "0x9952E59eAe73B48E298eD504028f8bDd168863B9"
       ],
-      "timestamp": "2025-08-21T21:22:41.674Z"
+      "timestamp": "2025-08-22T09:54:20.110Z"
     },
     {
       "step": 5,
       "contract": "GovernanceModule",
-      "address": "0x28eEEaB79543283ba994F80C67aEe5125fF218c5",
-      "timestamp": "2025-08-21T21:22:47.709Z"
+      "address": "0x23E2F185d052Cc85De5299953709D5F7039820B0",
+      "timestamp": "2025-08-22T09:54:25.690Z"
     }
   ]
 }

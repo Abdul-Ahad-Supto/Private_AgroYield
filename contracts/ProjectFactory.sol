@@ -6,14 +6,14 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-// ADD THIS IMPORT - Create interface for InvestmentManager
+// Interface for InvestmentManager
 interface IInvestmentManager {
     function releaseFundsToFarmer(uint256 projectId, address farmer, uint256 amount) external;
 }
 
 /**
- * @title ProjectFactory - FIXED VERSION - No More UNPREDICTABLE_GAS_LIMIT
- * @dev Complete solution for UNPREDICTABLE_GAS_LIMIT error by replacing low-level call
+ * @title ProjectFactory - SIMPLIFIED PRECISION VERSION
+ * @dev Simplified precision logic to avoid computational issues
  */
 contract ProjectFactory is ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -71,66 +71,31 @@ contract ProjectFactory is ReentrancyGuard {
     mapping(uint256 => Investment[]) public projectInvestments;
     mapping(address => uint256[]) public userInvestments;
     
-    // FIXED: Use interface instead of address for better type safety
+    // Investment manager interface
     IInvestmentManager public investmentManager;
     
-    // Constants for precision-safe calculations
-    uint256 public constant PRECISION_TOLERANCE = 10000; // 0.01 USDC (with 6 decimals)
-    uint256 public constant COMPLETION_TOLERANCE_PERCENTAGE = 100; // 0.1% in basis points
+    // 🎯 SIMPLIFIED CONSTANTS - Only essential ones
     uint256 public constant MIN_FUNDING_AMOUNT = 10 * 1e6; // 10 USDC
     uint256 public constant MAX_FUNDING_AMOUNT = 100000 * 1e6; // 100k USDC
     uint256 public constant MIN_DURATION_DAYS = 30;
     uint256 public constant MAX_DURATION_DAYS = 365;
     
-    // Enhanced precision constants
-    uint256 public constant ABSOLUTE_TOLERANCE_USDC = 10000; // 0.01 USDC
-    uint256 public constant PERCENTAGE_TOLERANCE_BASIS_POINTS = 10; // 0.1%
+    // 🎯 SIMPLIFIED PRECISION - Only one tolerance method
+    uint256 public constant COMPLETION_TOLERANCE = 50000; // 0.05 USDC (very permissive)
+    // Relative tolerance to avoid precision errors (0.1%)
+    uint256 public constant COMPLETION_TOLERANCE_BPS = 10; // 10 basis points = 0.1%
+
     
     // Events
-    event UserRegistered(
-        address indexed user, 
-        string name, 
-        string profileIPFSHash,
-        uint256 timestamp
-    );
-    
-    event ProjectCreated(
-        uint256 indexed projectId,
-        address indexed farmer,
-        string title,
-        uint256 targetAmountUSDC,
-        string imageIPFSHash,
-        uint256 deadline
-    );
-    
-    event ProjectInvestment(
-        uint256 indexed projectId,
-        address indexed investor,
-        uint256 amount,
-        uint256 newTotal
-    );
-    
-    event ProjectCompleted(
-        uint256 indexed projectId,
-        uint256 totalRaised,
-        uint256 investorCount
-    );
-    
-    event FundsReleased(
-        uint256 indexed projectId,
-        address indexed farmer,
-        uint256 amount,
-        uint256 timestamp
-    );
-    
-    event ProjectStatusUpdated(
-        uint256 indexed projectId,
-        ProjectStatus oldStatus,
-        ProjectStatus newStatus
-    );
+    event UserRegistered(address indexed user, string name, string profileIPFSHash, uint256 timestamp);
+    event ProjectCreated(uint256 indexed projectId, address indexed farmer, string title, uint256 targetAmountUSDC, string imageIPFSHash, uint256 deadline);
+    event ProjectInvestment(uint256 indexed projectId, address indexed investor, uint256 amount, uint256 newTotal);
+    event ProjectCompleted(uint256 indexed projectId, uint256 totalRaised, uint256 investorCount);
+    event FundsReleased(uint256 indexed projectId, address indexed farmer, uint256 amount, uint256 timestamp);
+    event ProjectStatusUpdated(uint256 indexed projectId, ProjectStatus oldStatus, ProjectStatus newStatus);
 
     /**
-     * @dev FIXED: Set the investment manager address using interface
+     * @dev Set the investment manager address
      */
     function setInvestmentManager(address _investmentManager) external {
         require(address(investmentManager) == address(0), "Investment manager already set");
@@ -139,12 +104,9 @@ contract ProjectFactory is ReentrancyGuard {
     }
     
     /**
-     * @dev Register a new user (farmer or investor)
+     * @dev Register a new user
      */
-    function registerUser(
-        string memory name,
-        string memory profileIPFSHash
-    ) external {
+    function registerUser(string memory name, string memory profileIPFSHash) external {
         require(!userProfiles[msg.sender].isRegistered, "User already registered");
         require(bytes(name).length > 0, "Name cannot be empty");
         
@@ -159,9 +121,16 @@ contract ProjectFactory is ReentrancyGuard {
         });
         
         _userCounter++;
-        
         emit UserRegistered(msg.sender, name, profileIPFSHash, block.timestamp);
     }
+
+    function _isWithinTolerance(uint256 current, uint256 target) internal pure returns (bool) {
+        if (current >= target) return true;
+        uint256 diff = target - current;
+        uint256 tolerance = (target * COMPLETION_TOLERANCE_BPS) / 10000;
+        return diff <= tolerance;
+    }
+
     
     /**
      * @dev Create a new farming project
@@ -180,16 +149,8 @@ contract ProjectFactory is ReentrancyGuard {
         require(bytes(title).length > 0, "Title cannot be empty");
         require(bytes(description).length > 0, "Description cannot be empty");
         require(bytes(imageIPFSHash).length > 0, "Image IPFS hash required");
-        require(
-            targetAmountUSDC >= MIN_FUNDING_AMOUNT && 
-            targetAmountUSDC <= MAX_FUNDING_AMOUNT,
-            "Invalid funding amount"
-        );
-        require(
-            durationDays >= MIN_DURATION_DAYS && 
-            durationDays <= MAX_DURATION_DAYS,
-            "Invalid duration"
-        );
+        require(targetAmountUSDC >= MIN_FUNDING_AMOUNT && targetAmountUSDC <= MAX_FUNDING_AMOUNT, "Invalid funding amount");
+        require(durationDays >= MIN_DURATION_DAYS && durationDays <= MAX_DURATION_DAYS, "Invalid duration");
         
         _projectIdCounter++;
         uint256 projectId = _projectIdCounter;
@@ -218,32 +179,17 @@ contract ProjectFactory is ReentrancyGuard {
         userProjects[msg.sender].push(projectId);
         userProfiles[msg.sender].projectCount++;
         
-        emit ProjectCreated(
-            projectId,
-            msg.sender,
-            title,
-            targetAmountUSDC,
-            imageIPFSHash,
-            deadline
-        );
+        emit ProjectCreated(projectId, msg.sender, title, targetAmountUSDC, imageIPFSHash, deadline);
     }
     
     /**
      * @dev Record investment (called by InvestmentManager)
      */
-    function recordInvestment(
-        uint256 projectId,
-        address investor,
-        uint256 amount
-    ) external {
+    function recordInvestment(uint256 projectId, address investor, uint256 amount) external {
         require(msg.sender == address(investmentManager), "Only InvestmentManager can call this");
         require(projects[projectId].id != 0, "Project does not exist");
         require(projects[projectId].status == ProjectStatus.Active, "Project not active");
         require(block.timestamp <= projects[projectId].deadline, "Funding period ended");
-        require(
-            projects[projectId].currentAmountUSDC + amount <= projects[projectId].targetAmountUSDC,
-            "Investment exceeds target"
-        );
         
         // Create investment record
         projectInvestments[projectId].push(Investment({
@@ -259,25 +205,16 @@ contract ProjectFactory is ReentrancyGuard {
         // Check if new investor
         _updateInvestorRecord(projectId, investor, amount);
         
-        emit ProjectInvestment(
-            projectId,
-            investor,
-            amount,
-            projects[projectId].currentAmountUSDC
-        );
+        emit ProjectInvestment(projectId, investor, amount, projects[projectId].currentAmountUSDC);
         
-        // Check completion with precision-safe logic
-        _checkProjectCompletionPrecisionSafe(projectId);
+        // 🎯 SIMPLIFIED COMPLETION CHECK
+        _checkProjectCompletion(projectId);
     }
     
     /**
      * @dev Internal function to update investor records
      */
-    function _updateInvestorRecord(
-        uint256 projectId,
-        address investor,
-        uint256 amount
-    ) internal {
+    function _updateInvestorRecord(uint256 projectId, address investor, uint256 amount) internal {
         bool isNewInvestor = true;
         uint256[] memory investments = userInvestments[investor];
         
@@ -297,89 +234,45 @@ contract ProjectFactory is ReentrancyGuard {
     }
     
     /**
-     * @dev PRECISION-SAFE PROJECT COMPLETION CHECK
+     * @dev 🎯 SIMPLIFIED PROJECT COMPLETION CHECK - Single tolerance method only
      */
-    function _checkProjectCompletionPrecisionSafe(uint256 projectId) internal {
+    function _checkProjectCompletion(uint256 projectId) internal {
         uint256 current = projects[projectId].currentAmountUSDC;
         uint256 target = projects[projectId].targetAmountUSDC;
         
-        // Method 1: Exact completion check
-        bool exactCompletion = current >= target;
-        
-        // Method 2: Absolute tolerance check (0.01 USDC)
-        bool absoluteTolerance = false;
-        if (target > current) {
-            uint256 difference = target - current;
-            absoluteTolerance = difference <= ABSOLUTE_TOLERANCE_USDC;
-        } else {
-            absoluteTolerance = true;
-        }
-        
-        // Method 3: Percentage tolerance check (0.1%)
-        bool percentageTolerance = false;
-        if (target > 0) {
-            uint256 difference = target > current ? target - current : 0;
-            uint256 percentageThreshold = (target * PERCENTAGE_TOLERANCE_BASIS_POINTS) / 10000;
-            percentageTolerance = difference <= percentageThreshold;
-        }
-        
-        // Project is complete if ANY tolerance method passes
-        bool isComplete = exactCompletion || absoluteTolerance || percentageTolerance;
-        
+        bool isComplete = _isWithinTolerance(current, target);
         if (isComplete && projects[projectId].status == ProjectStatus.Active) {
             ProjectStatus oldStatus = projects[projectId].status;
             projects[projectId].status = ProjectStatus.Completed;
             userProfiles[projects[projectId].farmer].totalRaised += current;
             
-            emit ProjectCompleted(
-                projectId,
-                current,
-                projects[projectId].investorCount
-            );
-            
+            emit ProjectCompleted(projectId, current, projects[projectId].investorCount);
             emit ProjectStatusUpdated(projectId, oldStatus, ProjectStatus.Completed);
         }
     }
     
     /**
-     * @dev PRECISION-SAFE FUND CLAIM ELIGIBILITY CHECK
+     * @dev 🎯 SIMPLIFIED CLAIM ELIGIBILITY CHECK - Single method only
      */
     function canClaimFunds(uint256 projectId) external view returns (bool) {
         Project memory project = projects[projectId];
         
-        // Basic validation checks
+        // Basic validation
         if (project.id == 0) return false;
         if (project.fundsReleased) return false;
         if (project.currentAmountUSDC == 0) return false;
         
-        // Enhanced precision-safe completion check
+        // Simple completion check
         uint256 current = project.currentAmountUSDC;
         uint256 target = project.targetAmountUSDC;
         
-        // Method 1: Exact completion
-        if (current >= target) return true;
-        
-        // Method 2: Absolute tolerance (0.01 USDC)
-        if (target > current) {
-            uint256 difference = target - current;
-            if (difference <= ABSOLUTE_TOLERANCE_USDC) return true;
-        }
-        
-        // Method 3: Percentage tolerance (0.1%)
-        if (target > 0) {
-            uint256 difference = target > current ? target - current : 0;
-            uint256 percentageThreshold = (target * PERCENTAGE_TOLERANCE_BASIS_POINTS) / 10000;
-            if (difference <= percentageThreshold) return true;
-        }
-        
-        // Must be in appropriate status
-        return (project.status == ProjectStatus.Completed || 
-                project.status == ProjectStatus.Active);
+        bool isEligible = _isWithinTolerance(current, target);
+
+        return isEligible && (project.status == ProjectStatus.Completed || project.status == ProjectStatus.Active);
     }
 
     /**
-     * @dev 🎯 FIXED: Farmer claims project funds (SOLUTION TO UNPREDICTABLE_GAS_LIMIT)
-     * REPLACED LOW-LEVEL CALL WITH HIGH-LEVEL INTERFACE CALL
+     * @dev 🎯 SIMPLIFIED claimProjectFunds - Minimal logic to avoid computation issues
      */
     function claimProjectFunds(uint256 projectId) external nonReentrant {
         Project storage project = projects[projectId];
@@ -389,133 +282,84 @@ contract ProjectFactory is ReentrancyGuard {
         require(!project.fundsReleased, "Funds already released");
         require(project.currentAmountUSDC > 0, "No funds to release");
         
-        // Use precision-safe eligibility check
-        require(this.canClaimFunds(projectId), "Project not eligible for fund claiming");
+        // 🎯 SIMPLIFIED eligibility check - avoid external call that might fail
+        uint256 current = project.currentAmountUSDC;
+        uint256 target = project.targetAmountUSDC;
+        require(_isWithinTolerance(current, target), "Project not eligible for fund claiming");
         
-        // Mark funds as released
+        // Mark funds as released BEFORE external call
         project.fundsReleased = true;
         project.fundsReleasedAt = block.timestamp;
         
-        // Update status to FundsReleased
+        // Update status
         ProjectStatus oldStatus = project.status;
         project.status = ProjectStatus.FundsReleased;
         
-        // 🎯 FIXED: Replace low-level call with high-level interface call
+        // 🎯 SIMPLIFIED external call - minimal error handling
         require(address(investmentManager) != address(0), "Investment manager not set");
         
-        // ✅ This is the fix - use proper interface call instead of low-level call
-        try investmentManager.releaseFundsToFarmer(
-            projectId, 
-            msg.sender, 
-            project.currentAmountUSDC
-        ) {
-            // Success case
-            emit FundsReleased(projectId, msg.sender, project.currentAmountUSDC, block.timestamp);
+        // Use low-level call with simple error handling
+        try investmentManager.releaseFundsToFarmer(projectId, msg.sender, current) {
+            emit FundsReleased(projectId, msg.sender, current, block.timestamp);
             emit ProjectStatusUpdated(projectId, oldStatus, ProjectStatus.FundsReleased);
-        } catch Error(string memory reason) {
-            // Handle known error with reason
-            revert(string.concat("Fund transfer failed: ", reason));
-        } catch (bytes memory) {
-            // Handle unknown error
-            revert("Fund transfer failed: Unknown error");
+        } catch {
+            // Revert state changes if external call fails
+            project.fundsReleased = false;
+            project.fundsReleasedAt = 0;
+            project.status = oldStatus;
+            revert("Fund transfer failed");
         }
-    }
-
-    /**
-     * @dev Get detailed precision analysis for debugging
-     */
-    function getProjectPrecisionStatus(uint256 projectId) external view returns (
-        uint256 currentAmount,
-        uint256 targetAmount,
-        uint256 difference,
-        bool exactCompletion,
-        bool absoluteTolerance,
-        bool percentageTolerance,
-        bool canClaim
-    ) {
-        Project memory project = projects[projectId];
-        currentAmount = project.currentAmountUSDC;
-        targetAmount = project.targetAmountUSDC;
-        difference = targetAmount > currentAmount ? targetAmount - currentAmount : 0;
-        
-        // Same logic as completion check
-        exactCompletion = currentAmount >= targetAmount;
-        
-        if (targetAmount > currentAmount) {
-            absoluteTolerance = difference <= ABSOLUTE_TOLERANCE_USDC;
-        } else {
-            absoluteTolerance = true;
-        }
-        
-        if (targetAmount > 0) {
-            uint256 percentageThreshold = (targetAmount * PERCENTAGE_TOLERANCE_BASIS_POINTS) / 10000;
-            percentageTolerance = difference <= percentageThreshold;
-        }
-        
-        canClaim = this.canClaimFunds(projectId);
     }
     
-    // Get individual project
+    // 🎯 SIMPLIFIED VIEW FUNCTIONS - Remove complex calculations
+    
     function getProject(uint256 projectId) external view returns (Project memory) {
         return projects[projectId];
     }
     
-    // View functions
     function getAllProjects() external view returns (Project[] memory) {
         Project[] memory allProjects = new Project[](_projectIdCounter);
-        
         for (uint256 i = 1; i <= _projectIdCounter; i++) {
             allProjects[i - 1] = projects[i];
         }
-        
         return allProjects;
     }
     
     function getActiveProjects() external view returns (Project[] memory) {
         uint256 activeCount = 0;
-        
         for (uint256 i = 1; i <= _projectIdCounter; i++) {
-            if (projects[i].status == ProjectStatus.Active && 
-                block.timestamp <= projects[i].deadline) {
+            if (projects[i].status == ProjectStatus.Active && block.timestamp <= projects[i].deadline) {
                 activeCount++;
             }
         }
         
         Project[] memory activeProjects = new Project[](activeCount);
         uint256 currentIndex = 0;
-        
         for (uint256 i = 1; i <= _projectIdCounter; i++) {
-            if (projects[i].status == ProjectStatus.Active && 
-                block.timestamp <= projects[i].deadline) {
+            if (projects[i].status == ProjectStatus.Active && block.timestamp <= projects[i].deadline) {
                 activeProjects[currentIndex] = projects[i];
                 currentIndex++;
             }
         }
-        
         return activeProjects;
     }
     
     function getCompletedProjects() external view returns (Project[] memory) {
         uint256 completedCount = 0;
-        
         for (uint256 i = 1; i <= _projectIdCounter; i++) {
-            if (projects[i].status == ProjectStatus.Completed || 
-                projects[i].status == ProjectStatus.FundsReleased) {
+            if (projects[i].status == ProjectStatus.Completed || projects[i].status == ProjectStatus.FundsReleased) {
                 completedCount++;
             }
         }
         
         Project[] memory completedProjects = new Project[](completedCount);
         uint256 currentIndex = 0;
-        
         for (uint256 i = 1; i <= _projectIdCounter; i++) {
-            if (projects[i].status == ProjectStatus.Completed || 
-                projects[i].status == ProjectStatus.FundsReleased) {
+            if (projects[i].status == ProjectStatus.Completed || projects[i].status == ProjectStatus.FundsReleased) {
                 completedProjects[currentIndex] = projects[i];
                 currentIndex++;
             }
         }
-        
         return completedProjects;
     }
     
@@ -542,7 +386,6 @@ contract ProjectFactory is ReentrancyGuard {
     function getFundingProgress(uint256 projectId) external view returns (uint256) {
         Project memory project = projects[projectId];
         if (project.targetAmountUSDC == 0) return 0;
-        
         return (project.currentAmountUSDC * 100) / project.targetAmountUSDC;
     }
     
@@ -554,7 +397,6 @@ contract ProjectFactory is ReentrancyGuard {
     ) {
         totalProjects = _projectIdCounter;
         totalUsers = _userCounter;
-        
         for (uint256 i = 1; i <= _projectIdCounter; i++) {
             totalInvestments += projectInvestments[i].length;
             totalFunding += projects[i].currentAmountUSDC;

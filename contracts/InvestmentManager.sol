@@ -250,58 +250,71 @@ contract InvestmentManager is ReentrancyGuard {
     }
     
     /**
-     * @dev Execute investment with final investment handling and automatic refunds
-     */
+    * @dev Helper to calculate gross amount needed to reach net target considering platform fee
+    * @param remainingAmount The remaining net amount needed
+    * @param feeBps Platform fee in basis points
+    */
+    function _calculateGrossForNet(uint256 remainingAmount, uint256 feeBps) internal pure returns (uint256) {
+        // Ceil division: (numerator + denominator - 1) / denominator
+        uint256 numerator = remainingAmount * 10000;
+        uint256 denominator = 10000 - feeBps;
+        return (numerator + denominator - 1) / denominator;
+    }
+
+    /**
+    * @dev Execute investment with final investment handling and automatic refunds
+    */
     function _executeInvestment(uint256 projectId, uint256 amountUSDC, bool isComplete) internal {
         uint256 originalAmount = amountUSDC;
-        
+
         // Transfer initial USDC amount
         USDC.safeTransferFrom(msg.sender, address(this), amountUSDC);
-        
-        // Calculate fees
+
+        // Calculate platform fee
         uint256 platformFee = (amountUSDC * PLATFORM_FEE) / 10000;
         uint256 netInvestment = amountUSDC - platformFee;
         uint256 refundAmount = 0;
-        
+
         // If this completes the project, adjust investment to exact remaining amount
         if (isComplete) {
             ProjectFactory.Project memory project = projectFactory.getProject(projectId);
             uint256 remainingAmount = project.targetAmountUSDC - project.currentAmountUSDC;
-            
+
             if (netInvestment > remainingAmount) {
-                // Calculate excess and refund
-                uint256 excessNet = netInvestment - remainingAmount;
-                uint256 excessGross = (excessNet * 10000) / (10000 - PLATFORM_FEE);
-                
-                // Adjust amounts
-                refundAmount = excessGross;
-                amountUSDC = originalAmount - refundAmount;
+                // Calculate gross amount needed to reach exact net remaining
+                uint256 requiredGross = _calculateGrossForNet(remainingAmount, PLATFORM_FEE);
+
+                // Refund the excess
+                refundAmount = amountUSDC - requiredGross;
+                amountUSDC = requiredGross;
+
                 platformFee = (amountUSDC * PLATFORM_FEE) / 10000;
                 netInvestment = amountUSDC - platformFee;
-                
+
                 // Refund excess to investor
-                USDC.safeTransfer(msg.sender, refundAmount);
-                
-                emit ExcessRefunded(msg.sender, projectId, refundAmount);
+                if (refundAmount > 0) {
+                    USDC.safeTransfer(msg.sender, refundAmount);
+                    emit ExcessRefunded(msg.sender, projectId, refundAmount);
+                }
             }
         }
-        
+
         // Record investment on ProjectFactory
         projectFactory.recordInvestment(projectId, msg.sender, netInvestment);
-        
+
         // Update local records
         _updateInvestorData(projectId, netInvestment);
         _updateYieldInfo(projectId, netInvestment);
-        
+
         emit InvestmentMade(
-            msg.sender, 
-            projectId, 
-            amountUSDC, 
-            platformFee, 
-            netInvestment, 
+            msg.sender,
+            projectId,
+            amountUSDC,
+            platformFee,
+            netInvestment,
             isComplete
         );
-        
+
         // Check if project is now completed
         if (isComplete) {
             ProjectFactory.Project memory updatedProject = projectFactory.getProject(projectId);
@@ -312,6 +325,7 @@ contract InvestmentManager is ReentrancyGuard {
             );
         }
     }
+
     
     /**
      * @dev Update investor data
@@ -367,7 +381,12 @@ contract InvestmentManager is ReentrancyGuard {
         // Verify the project is completed and farmer is correct
         ProjectFactory.Project memory project = projectFactory.getProject(projectId);
         require(project.farmer == farmer, "Invalid farmer");
-        require(project.status == ProjectFactory.ProjectStatus.Completed, "Project not completed");
+        require(
+            project.status == ProjectFactory.ProjectStatus.Completed || 
+            _isWithinTolerance(project.currentAmountUSDC, project.targetAmountUSDC),
+            "Project not completed within tolerance"
+        );
+
         
         // Ensure we have enough balance
         require(USDC.balanceOf(address(this)) >= amount, "Insufficient contract balance");
@@ -392,7 +411,7 @@ contract InvestmentManager is ReentrancyGuard {
         ProjectFactory.Project memory project = projectFactory.getProject(projectId);
         return (
             project.id != 0 &&
-            project.status == ProjectFactory.ProjectStatus.Completed &&
+            (_isWithinTolerance(project.currentAmountUSDC, project.targetAmountUSDC) || project.status == ProjectFactory.ProjectStatus.Completed) &&
             project.currentAmountUSDC > 0
         );
     }
@@ -411,7 +430,13 @@ contract InvestmentManager is ReentrancyGuard {
             releasedAt[projectId]
         );
     }
-    
+    // Relative tolerance check (0.1%) to avoid precision errors
+    function _isWithinTolerance(uint256 current, uint256 target) internal pure returns (bool) {
+        if (current >= target) return true;
+        uint256 diff = target - current;
+        uint256 tolerance = (target * 10) / 10000; // 10 bps = 0.1%
+        return diff <= tolerance;
+    }
     // ==========================================
     // RETURN DISTRIBUTION FUNCTIONS
     // ==========================================

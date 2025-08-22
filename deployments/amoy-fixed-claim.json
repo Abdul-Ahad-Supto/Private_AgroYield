@@ -1,0 +1,18 @@
+{
+  "network": "amoy",
+  "timestamp": "2025-08-22T08:32:06.879Z",
+  "deployer": "0xBF27545DA45F8c39907abf1617152F0C457ed8cc",
+  "version": "2.2.0-fixed-claimProjectFunds",
+  "status": "FIXED_WITH_CLAIM_FUNCTION",
+  "contracts": {
+    "projectFactory": "0x1cf01ad90CFBB93705839cAa8B2A35ed62f493Ea",
+    "investmentManager": "0x75f55D87ce3950A2Dc246bd7B071936be68806D4",
+    "yieldDistributor": "0x1b867E99Be4cf270f269C93Dea2a00FcB299E8Cd",
+    "governanceModule": "0x78E199d3728dCdec30221c987c74f589ED61967a"
+  },
+  "features": {
+    "claimProjectFunds": true,
+    "precisionSafeClaiming": true,
+    "fullLifecycle": true
+  }
+}

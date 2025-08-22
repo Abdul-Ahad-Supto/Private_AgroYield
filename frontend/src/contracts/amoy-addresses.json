@@ -1,8 +1,8 @@
 {
-  "projectFactory": "0xAd723852eC2AeB9e180a02319888937665304584",
-  "investmentManager": "0xaF2Fd072631FbB58db87c0534a8bCBBFe58dC57c",
-  "yieldDistributor": "0x2eab322f6DFbEB9133B33C4F1A44d14563b0b2Fa",
-  "governanceModule": "0x28eEEaB79543283ba994F80C67aEe5125fF218c5",
+  "projectFactory": "0x5d82905AcC8fD9730C56a3DAeAa08dBCe10d7169",
+  "investmentManager": "0x9952E59eAe73B48E298eD504028f8bDd168863B9",
+  "yieldDistributor": "0xBea293f70c2C5b87c61d49ccc0f76FBa902f350D",
+  "governanceModule": "0x23E2F185d052Cc85De5299953709D5F7039820B0",
   "network": "amoy",
   "chainId": 80002,
   "usdcAddress": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
