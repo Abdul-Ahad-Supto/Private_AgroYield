@@ -929,6 +929,11 @@
       },
       {
         "internalType": "bool",
+        "name": "specialRule99Percent",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
         "name": "canClaim",
         "type": "bool"
       }

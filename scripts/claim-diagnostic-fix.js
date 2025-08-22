@@ -1,17 +1,25 @@
-// scripts/direct-claim-fix.js - SIMULATE EXACT FRONTEND CLAIM PROCESS
+// scripts/fixed-claim-diagnostic.js - FIXED VERSION WITH CORRECT ADDRESSES
 const { ethers } = require("hardhat");
 
-async function directClaimFix() {
-  console.log("🔧 DIRECT FRONTEND-STYLE CLAIM FIX");
+async function fixedClaimDiagnostic() {
+  console.log("🔧 FIXED CLAIM DIAGNOSTIC - USING CORRECT ADDRESSES");
   console.log("=" .repeat(60));
   
-  // This simulates exactly what your frontend should be doing
-  const PROJECT_FACTORY = "0x7C9E5Cf352e1994dbe3066C4Aa1DFaDc32E33e34";
+  // ✅ CORRECT ADDRESSES from your latest deployment (amoy-precision-safe-final.json)
+  const PROJECT_FACTORY = "0x12C784201524c9F4971875A07fcbf402134A285f";
+  const INVESTMENT_MANAGER = "0x74bc118427502E1a67B4bddD602E9E5341E0E1BD";
   const USDC_ADDRESS = "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582";
   const FARMER_ADDRESS = "0xBF27545DA45F8c39907abf1617152F0C457ed8cc";
   
+  console.log("📋 USING CORRECT CONTRACT ADDRESSES:");
+  console.log("   ProjectFactory:    ", PROJECT_FACTORY);
+  console.log("   InvestmentManager: ", INVESTMENT_MANAGER);
+  console.log("   USDC Address:      ", USDC_ADDRESS);
+  console.log("   Farmer Address:    ", FARMER_ADDRESS);
+  console.log();
+
   try {
-    // Get the farmer signer (this is what your frontend wallet connection does)
+    // Get the farmer signer
     const [deployer] = await ethers.getSigners();
     console.log("Current signer:", await deployer.getAddress());
     
@@ -30,9 +38,25 @@ async function directClaimFix() {
     
     console.log("✅ Correct farmer account connected!");
     
-    // Get contracts (same as frontend)
-    const projectFactory = await ethers.getContractAt("ProjectFactory", PROJECT_FACTORY);
-    const usdc = await ethers.getContractAt("IERC20", USDC_ADDRESS);
+    // ✅ FIXED: Get contracts with correct addresses and error handling
+    let projectFactory, usdc;
+    
+    try {
+      console.log("\n🔍 Loading ProjectFactory contract...");
+      projectFactory = await ethers.getContractAt("ProjectFactory", PROJECT_FACTORY);
+      console.log("✅ ProjectFactory loaded successfully");
+      
+      console.log("🔍 Loading USDC contract...");
+      usdc = await ethers.getContractAt("IERC20", USDC_ADDRESS);
+      console.log("✅ USDC contract loaded successfully");
+    } catch (contractError) {
+      console.error("❌ Error loading contracts:", contractError.message);
+      console.log("\n🔧 Possible issues:");
+      console.log("   1. Wrong contract addresses");
+      console.log("   2. Contracts not deployed on this network");
+      console.log("   3. Network connection issues");
+      return;
+    }
     
     console.log("\n📋 PRE-CLAIM VERIFICATION:");
     console.log("-".repeat(40));
@@ -48,21 +72,98 @@ async function directClaimFix() {
       console.log("   ⚠️ Low MATIC balance! Need more for gas fees");
     }
     
-    // Check project status (same checks as frontend)
-    const project = await projectFactory.getProject(1);
-    console.log("   Project title:", project.title);
-    console.log("   Current amount:", ethers.formatUnits(project.currentAmountUSDC, 6) + " USDC");
-    console.log("   Target amount:", ethers.formatUnits(project.targetAmountUSDC, 6) + " USDC");
-    console.log("   Status:", getProjectStatus(project.status));
-    console.log("   Funds released:", project.fundsReleased ? "Yes" : "No");
+    // Check project status
+    let project;
+    try {
+      console.log("\n🔍 Loading project data...");
+      project = await projectFactory.getProject(1);
+      
+      if (!project || project.id.toString() === "0") {
+        console.log("❌ No project found with ID 1");
+        console.log("   The project may not exist or was deployed on a different contract");
+        return;
+      }
+      
+      console.log("✅ Project loaded successfully");
+      console.log("   Project title:", project.title);
+      console.log("   Current amount:", ethers.formatUnits(project.currentAmountUSDC, 6) + " USDC");
+      console.log("   Target amount:", ethers.formatUnits(project.targetAmountUSDC, 6) + " USDC");
+      console.log("   Status:", getProjectStatus(project.status));
+      console.log("   Funds released:", project.fundsReleased ? "Yes" : "No");
+      
+    } catch (projectError) {
+      console.error("❌ Error loading project:", projectError.message);
+      console.log("   The project may not exist on this deployment");
+      return;
+    }
     
-    // Critical check - same as frontend does
-    const canClaim = await projectFactory.canClaimFunds(1);
-    console.log("   Smart contract canClaim:", canClaim ? "✅ YES" : "❌ NO");
+    // ✅ FIXED: Check if claimProjectFunds function exists
+    console.log("\n🔍 CHECKING CONTRACT FUNCTION AVAILABILITY:");
+    console.log("-".repeat(40));
     
-    if (!canClaim) {
-      console.log("❌ Smart contract prevents claiming!");
-      console.log("   The frontend should not show the claim button.");
+    try {
+      // Test if the function exists by checking the contract interface
+      const projectFactoryInterface = projectFactory.interface;
+      const hasClaimFunction = projectFactoryInterface.hasFunction("claimProjectFunds");
+      
+      console.log("   claimProjectFunds function:", hasClaimFunction ? "✅ EXISTS" : "❌ MISSING");
+      
+      if (!hasClaimFunction) {
+        console.log("❌ CRITICAL: claimProjectFunds function not found!");
+        console.log("   This means:");
+        console.log("   1. You're using the wrong contract address");
+        console.log("   2. The contract doesn't have the claimProjectFunds function");
+        console.log("   3. The ABI is outdated");
+        
+        console.log("\n🔍 Available functions on this contract:");
+        const functions = Object.keys(projectFactoryInterface.functions);
+        functions.slice(0, 10).forEach(func => {
+          console.log(`     ${func}`);
+        });
+        if (functions.length > 10) {
+          console.log(`     ... and ${functions.length - 10} more functions`);
+        }
+        
+        return;
+      }
+      
+    } catch (interfaceError) {
+      console.error("❌ Error checking contract interface:", interfaceError.message);
+      return;
+    }
+    
+    // Check canClaimFunds
+    try {
+      const canClaim = await projectFactory.canClaimFunds(1);
+      console.log("   Smart contract canClaim:", canClaim ? "✅ YES" : "❌ NO");
+      
+      if (!canClaim) {
+        console.log("❌ Smart contract prevents claiming!");
+        console.log("   Reasons could be:");
+        console.log("   - Project not fully funded");
+        console.log("   - Funds already released");
+        console.log("   - Project not in completed status");
+        
+        // Check precision status if function exists
+        try {
+          const precisionStatus = await projectFactory.getProjectPrecisionStatus(1);
+          console.log("\n📊 PRECISION STATUS:");
+          console.log("   Current amount:", ethers.formatUnits(precisionStatus.currentAmount, 6) + " USDC");
+          console.log("   Target amount:", ethers.formatUnits(precisionStatus.targetAmount, 6) + " USDC");
+          console.log("   Difference:", ethers.formatUnits(precisionStatus.difference, 6) + " USDC");
+          console.log("   Exact completion:", precisionStatus.exactCompletion);
+          console.log("   Absolute tolerance:", precisionStatus.absoluteTolerance);
+          console.log("   Percentage tolerance:", precisionStatus.percentageTolerance);
+          console.log("   Can claim (precision):", precisionStatus.canClaim);
+        } catch (precisionError) {
+          console.log("   (Precision status not available)");
+        }
+        
+        return;
+      }
+      
+    } catch (canClaimError) {
+      console.error("❌ Error checking canClaimFunds:", canClaimError.message);
       return;
     }
     
@@ -72,161 +173,72 @@ async function directClaimFix() {
       return;
     }
     
-    console.log("\n🔧 FRONTEND CLAIM SIMULATION:");
+    console.log("\n🔧 ATTEMPTING CLAIM:");
     console.log("-".repeat(40));
     
-    // This is exactly what happens when you click "Claim Funds" in frontend
-    console.log("   Step 1: Estimating gas...");
-    
-    let gasEstimate;
+    // Try the actual claim with proper error handling
     try {
-      gasEstimate = await projectFactory.estimateGas.claimProjectFunds(1);
+      console.log("   Step 1: Estimating gas...");
+      
+      const gasEstimate = await projectFactory.estimateGas.claimProjectFunds(1);
       console.log("   ✅ Gas estimate:", gasEstimate.toString());
-    } catch (gasError) {
-      console.log("   ❌ Gas estimation failed:", gasError.message);
       
-      // Try with static call to see what would happen
-      try {
-        await projectFactory.callStatic.claimProjectFunds(1);
-        console.log("   ✅ Static call succeeded - transaction should work");
-      } catch (staticError) {
-        console.log("   ❌ Static call failed:", staticError.reason || staticError.message);
-        console.log("   This is why your frontend claim is failing!");
-        
-        // Specific error handling
-        if (staticError.message.includes("not eligible")) {
-          console.log("\n🔧 AUTO-FIX: Making project eligible...");
-          await makeProjectFullyFunded();
-          return;
-        }
-        
-        return;
-      }
-    }
-    
-    console.log("   Step 2: Sending transaction...");
-    
-    // Try multiple gas strategies (same as good frontend would do)
-    const gasStrategies = [
-      { gasLimit: gasEstimate.mul(110).div(100), gasPrice: null }, // 10% buffer, market price
-      { gasLimit: gasEstimate.mul(130).div(100), gasPrice: ethers.parseUnits("30", "gwei") }, // 30% buffer, 30 gwei
-      { gasLimit: gasEstimate.mul(150).div(100), gasPrice: ethers.parseUnits("50", "gwei") }, // 50% buffer, 50 gwei
-      { gasLimit: 500000, gasPrice: ethers.parseUnits("80", "gwei") } // High fixed values
-    ];
-    
-    for (let i = 0; i < gasStrategies.length; i++) {
-      const strategy = gasStrategies[i];
-      console.log(`   Attempt ${i + 1}: gasLimit=${strategy.gasLimit}, gasPrice=${strategy.gasPrice ? ethers.formatUnits(strategy.gasPrice, "gwei") + " gwei" : "market"}`);
+      console.log("   Step 2: Performing static call test...");
+      await projectFactory.callStatic.claimProjectFunds(1);
+      console.log("   ✅ Static call succeeded - transaction should work");
       
-      try {
-        const txParams = { gasLimit: strategy.gasLimit };
-        if (strategy.gasPrice) {
-          txParams.gasPrice = strategy.gasPrice;
-        }
-        
-        const claimTx = await projectFactory.claimProjectFunds(1, txParams);
-        console.log("   📋 Transaction sent:", claimTx.hash);
-        console.log("   ⏳ Waiting for confirmation...");
-        
-        const receipt = await claimTx.wait();
-        console.log("   ✅ SUCCESS! Gas used:", receipt.gasUsed.toString());
-        
-        // Verify the claim worked
-        const updatedProject = await projectFactory.getProject(1);
-        const newFarmerUSDC = await usdc.balanceOf(FARMER_ADDRESS);
-        const claimedAmount = newFarmerUSDC.sub(farmerUSDC);
-        
-        console.log("\n🎉 CLAIM VERIFICATION:");
-        console.log("   Funds released:", updatedProject.fundsReleased ? "✅ YES" : "❌ NO");
-        console.log("   USDC claimed:", ethers.formatUnits(claimedAmount, 6) + " USDC");
-        console.log("   New farmer balance:", ethers.formatUnits(newFarmerUSDC, 6) + " USDC");
-        
-        console.log("\n✅ FRONTEND CLAIM WOULD WORK WITH THESE SETTINGS!");
-        console.log("   Problem solved - use higher gas settings in your frontend.");
-        return;
-        
-      } catch (attemptError) {
-        console.log(`   ❌ Attempt ${i + 1} failed:`, attemptError.message);
-        
-        if (i === gasStrategies.length - 1) {
-          console.log("\n❌ ALL GAS STRATEGIES FAILED!");
-          console.log("   This indicates a deeper smart contract issue.");
-          
-          // Final diagnosis
-          await finalDiagnosis(projectFactory);
-        }
+      console.log("   Step 3: Sending actual transaction...");
+      
+      const claimTx = await projectFactory.claimProjectFunds(1, {
+        gasLimit: gasEstimate.mul(120).div(100), // 20% buffer
+        gasPrice: ethers.parseUnits("30", "gwei") // 30 gwei
+      });
+      
+      console.log("   📋 Transaction sent:", claimTx.hash);
+      console.log("   ⏳ Waiting for confirmation...");
+      
+      const receipt = await claimTx.wait();
+      console.log("   ✅ SUCCESS! Gas used:", receipt.gasUsed.toString());
+      
+      // Verify the claim worked
+      const updatedProject = await projectFactory.getProject(1);
+      const newFarmerUSDC = await usdc.balanceOf(FARMER_ADDRESS);
+      const claimedAmount = newFarmerUSDC.sub(farmerUSDC);
+      
+      console.log("\n🎉 CLAIM VERIFICATION:");
+      console.log("   Funds released:", updatedProject.fundsReleased ? "✅ YES" : "❌ NO");
+      console.log("   USDC claimed:", ethers.formatUnits(claimedAmount, 6) + " USDC");
+      console.log("   New farmer balance:", ethers.formatUnits(newFarmerUSDC, 6) + " USDC");
+      
+      console.log("\n✅ CLAIM SUCCESSFUL!");
+      console.log("   Your frontend should work now with the same settings.");
+      
+    } catch (claimError) {
+      console.error("❌ Claim failed:", claimError.message);
+      console.log("\n🔧 Error details:");
+      console.log("   Error code:", claimError.code || "unknown");
+      console.log("   Error reason:", claimError.reason || "unknown");
+      
+      if (claimError.message.includes("insufficient funds")) {
+        console.log("\n💡 SOLUTION: Add more MATIC to farmer account");
+      } else if (claimError.message.includes("nonce")) {
+        console.log("\n💡 SOLUTION: Reset MetaMask account nonce");
+      } else if (claimError.message.includes("gas")) {
+        console.log("\n💡 SOLUTION: Try increasing gas price or limit");
+      } else {
+        console.log("\n💡 SOLUTION: Check contract state and try again");
       }
     }
     
   } catch (error) {
-    console.error("❌ Direct claim fix failed:", error.message);
+    console.error("❌ Script failed:", error.message);
     
-    console.log("\n🔧 DEBUGGING INFO:");
-    console.log("   Error type:", error.code || "unknown");
-    console.log("   Error reason:", error.reason || "unknown");
-    console.log("   Error message:", error.message);
-    
-    if (error.message.includes("insufficient funds")) {
-      console.log("\n💡 SOLUTION: Add more MATIC to farmer account");
-      console.log("   Farmer needs MATIC for gas fees");
-    }
-    
-    if (error.message.includes("nonce")) {
-      console.log("\n💡 SOLUTION: Reset MetaMask account");
-      console.log("   Settings > Advanced > Reset Account");
-    }
-  }
-}
-
-async function makeProjectFullyFunded() {
-  console.log("\n🔧 AUTO-FIX: Completing project funding...");
-  
-  const INVESTMENT_MANAGER = "0xEdA444Bddd7Af7fD5a66bff9e614D6BCdc139ad2";
-  const USDC_ADDRESS = "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582";
-  
-  try {
-    const [signer] = await ethers.getSigners();
-    const investmentManager = await ethers.getContractAt("InvestmentManager", INVESTMENT_MANAGER);
-    const usdc = await ethers.getContractAt("IERC20", USDC_ADDRESS);
-    
-    // Invest the missing 0.00225 USDC + buffer
-    const investAmount = ethers.parseUnits("0.01", 6); // 0.01 USDC should be enough
-    
-    console.log("   Approving 0.01 USDC...");
-    const approveTx = await usdc.approve(INVESTMENT_MANAGER, investAmount);
-    await approveTx.wait();
-    
-    console.log("   Investing to complete project...");
-    const investTx = await investmentManager.investInProject(1, investAmount);
-    await investTx.wait();
-    
-    console.log("   ✅ Project completed! Now try claiming again.");
-    
-  } catch (error) {
-    console.log("   ❌ Auto-fix failed:", error.message);
-  }
-}
-
-async function finalDiagnosis(projectFactory) {
-  console.log("\n🔍 FINAL DIAGNOSIS:");
-  console.log("-".repeat(30));
-  
-  try {
-    // Check if there's a linking issue
-    const linkedManager = await projectFactory.investmentManager();
-    console.log("   Linked InvestmentManager:", linkedManager);
-    console.log("   Expected:", "0xEdA444Bddd7Af7fD5a66bff9e614D6BCdc139ad2");
-    
-    const isLinked = linkedManager.toLowerCase() === "0xEdA444Bddd7Af7fD5a66bff9e614D6BCdc139ad2".toLowerCase();
-    console.log("   Contracts linked:", isLinked ? "✅ YES" : "❌ NO");
-    
-    if (!isLinked) {
-      console.log("   🔧 CONTRACT LINKING ISSUE FOUND!");
-      console.log("   This is why the claim is failing.");
-    }
-    
-  } catch (error) {
-    console.log("   Diagnosis failed:", error.message);
+    console.log("\n🔧 DEBUGGING CHECKLIST:");
+    console.log("1. ✅ Are you connected to Amoy network?");
+    console.log("2. ✅ Are the contract addresses correct?");
+    console.log("3. ✅ Does your account have MATIC for gas?");
+    console.log("4. ✅ Is the project actually eligible for claiming?");
+    console.log("5. ✅ Are you using the farmer account that created the project?");
   }
 }
 
@@ -240,4 +252,43 @@ function getProjectStatus(statusCode) {
   return statuses[statusCode] || `Unknown (${statusCode})`;
 }
 
-directClaimFix().catch(console.error);
+// Add comprehensive contract verification
+async function verifyContracts() {
+  console.log("\n🔍 COMPREHENSIVE CONTRACT VERIFICATION:");
+  console.log("-".repeat(50));
+  
+  const PROJECT_FACTORY = "0x12C784201524c9F4971875A07fcbf402134A285f";
+  const INVESTMENT_MANAGER = "0x74bc118427502E1a67B4bddD602E9E5341E0E1BD";
+  
+  try {
+    const projectFactory = await ethers.getContractAt("ProjectFactory", PROJECT_FACTORY);
+    
+    // Check if contracts are properly linked
+    const linkedManager = await projectFactory.investmentManager();
+    console.log("   ProjectFactory → InvestmentManager:");
+    console.log("   Expected:", INVESTMENT_MANAGER);
+    console.log("   Actual:  ", linkedManager);
+    console.log("   Status:  ", linkedManager.toLowerCase() === INVESTMENT_MANAGER.toLowerCase() ? "✅ LINKED" : "❌ NOT LINKED");
+    
+    // Check contract functions
+    const totalProjects = await projectFactory.getTotalProjects();
+    console.log("   Total projects:", totalProjects.toString());
+    
+    if (totalProjects > 0) {
+      const project = await projectFactory.getProject(1);
+      console.log("   Project 1 exists:", project.id.toString() !== "0" ? "✅ YES" : "❌ NO");
+      
+      if (project.id.toString() !== "0") {
+        console.log("   Project title:", project.title);
+        console.log("   Project farmer:", project.farmer);
+      }
+    }
+    
+  } catch (error) {
+    console.log("   ❌ Contract verification failed:", error.message);
+  }
+}
+
+fixedClaimDiagnostic()
+  .then(() => verifyContracts())
+  .catch(console.error);

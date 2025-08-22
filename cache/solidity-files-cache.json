@@ -423,8 +423,8 @@
       ]
     },
     "C:\\Users\\USER\\Documents\\AgroYield-Working\\Private_AgroYield\\contracts\\ProjectFactory.sol": {
-      "lastModificationDate": 1755808278700,
-      "contentHash": "14cb2d2f203a8d46df3d0cf5046639f3",
+      "lastModificationDate": 1755811252793,
+      "contentHash": "17877d48e213abfddaddc12b30e2f988",
       "sourceName": "contracts/ProjectFactory.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -461,6 +461,7 @@
         "^0.8.20"
       ],
       "artifacts": [
+        "IInvestmentManager",
         "ProjectFactory"
       ]
     },

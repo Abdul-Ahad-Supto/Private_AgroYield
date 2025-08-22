@@ -6,9 +6,14 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+// ADD THIS IMPORT - Create interface for InvestmentManager
+interface IInvestmentManager {
+    function releaseFundsToFarmer(uint256 projectId, address farmer, uint256 amount) external;
+}
+
 /**
- * @title ProjectFactory - FIXED VERSION WITH PROPER FUND CLAIMING
- * @dev Complete solution for UNPREDICTABLE_GAS_LIMIT error
+ * @title ProjectFactory - FIXED VERSION - No More UNPREDICTABLE_GAS_LIMIT
+ * @dev Complete solution for UNPREDICTABLE_GAS_LIMIT error by replacing low-level call
  */
 contract ProjectFactory is ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -66,8 +71,8 @@ contract ProjectFactory is ReentrancyGuard {
     mapping(uint256 => Investment[]) public projectInvestments;
     mapping(address => uint256[]) public userInvestments;
     
-    // Investment Manager address for fund release
-    address public investmentManager;
+    // FIXED: Use interface instead of address for better type safety
+    IInvestmentManager public investmentManager;
     
     // Constants for precision-safe calculations
     uint256 public constant PRECISION_TOLERANCE = 10000; // 0.01 USDC (with 6 decimals)
@@ -125,12 +130,12 @@ contract ProjectFactory is ReentrancyGuard {
     );
 
     /**
-     * @dev Set the investment manager address (called after deployment)
+     * @dev FIXED: Set the investment manager address using interface
      */
     function setInvestmentManager(address _investmentManager) external {
-        require(investmentManager == address(0), "Investment manager already set");
+        require(address(investmentManager) == address(0), "Investment manager already set");
         require(_investmentManager != address(0), "Invalid address");
-        investmentManager = _investmentManager;
+        investmentManager = IInvestmentManager(_investmentManager);
     }
     
     /**
@@ -231,7 +236,7 @@ contract ProjectFactory is ReentrancyGuard {
         address investor,
         uint256 amount
     ) external {
-        require(msg.sender == investmentManager, "Only InvestmentManager can call this");
+        require(msg.sender == address(investmentManager), "Only InvestmentManager can call this");
         require(projects[projectId].id != 0, "Project does not exist");
         require(projects[projectId].status == ProjectStatus.Active, "Project not active");
         require(block.timestamp <= projects[projectId].deadline, "Funding period ended");
@@ -374,8 +379,7 @@ contract ProjectFactory is ReentrancyGuard {
 
     /**
      * @dev 🎯 FIXED: Farmer claims project funds (SOLUTION TO UNPREDICTABLE_GAS_LIMIT)
-     * This function acts as a proxy to call InvestmentManager.releaseFundsToFarmer
-     * Frontend should call THIS function, not InvestmentManager directly
+     * REPLACED LOW-LEVEL CALL WITH HIGH-LEVEL INTERFACE CALL
      */
     function claimProjectFunds(uint256 projectId) external nonReentrant {
         Project storage project = projects[projectId];
@@ -396,23 +400,25 @@ contract ProjectFactory is ReentrancyGuard {
         ProjectStatus oldStatus = project.status;
         project.status = ProjectStatus.FundsReleased;
         
-        // 🎯 KEY FIX: Call InvestmentManager from ProjectFactory
-        // Now msg.sender will be the ProjectFactory address
-        require(investmentManager != address(0), "Investment manager not set");
+        // 🎯 FIXED: Replace low-level call with high-level interface call
+        require(address(investmentManager) != address(0), "Investment manager not set");
         
-        // Call the investment manager to release funds
-        (bool success, ) = investmentManager.call(
-            abi.encodeWithSignature("releaseFundsToFarmer(uint256,address,uint256)", 
-                projectId, 
-                msg.sender, 
-                project.currentAmountUSDC
-            )
-        );
-        
-        require(success, "Fund transfer failed");
-        
-        emit FundsReleased(projectId, msg.sender, project.currentAmountUSDC, block.timestamp);
-        emit ProjectStatusUpdated(projectId, oldStatus, ProjectStatus.FundsReleased);
+        // ✅ This is the fix - use proper interface call instead of low-level call
+        try investmentManager.releaseFundsToFarmer(
+            projectId, 
+            msg.sender, 
+            project.currentAmountUSDC
+        ) {
+            // Success case
+            emit FundsReleased(projectId, msg.sender, project.currentAmountUSDC, block.timestamp);
+            emit ProjectStatusUpdated(projectId, oldStatus, ProjectStatus.FundsReleased);
+        } catch Error(string memory reason) {
+            // Handle known error with reason
+            revert(string.concat("Fund transfer failed: ", reason));
+        } catch (bytes memory) {
+            // Handle unknown error
+            revert("Fund transfer failed: Unknown error");
+        }
     }
 
     /**
